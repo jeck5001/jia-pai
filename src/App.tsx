@@ -1,4 +1,4 @@
-import { Barcode, FileUp, History, RefreshCw, Search, ShoppingBasket } from 'lucide-react';
+import { Barcode, FileUp, History, PackageSearch, RefreshCw, Search, ShoppingBasket } from 'lucide-react';
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { formatPrice, isPublishedCatalog, searchProducts } from './lib/catalog';
 import { fetchCatalog } from './lib/server-api';
@@ -6,6 +6,7 @@ import type { Catalog, Product } from './types';
 
 const ImportWorkspace = lazy(() => import('./components/ImportWorkspace').then((module) => ({ default: module.ImportWorkspace })));
 const PhotoImportWorkspace = lazy(() => import('./components/PhotoImportWorkspace').then((module) => ({ default: module.PhotoImportWorkspace })));
+const ProductManagementWorkspace = lazy(() => import('./components/ProductManagementWorkspace').then((module) => ({ default: module.ProductManagementWorkspace })));
 const ScannerDialog = lazy(() => import('./components/ScannerDialog').then((module) => ({ default: module.ScannerDialog })));
 
 type CatalogState =
@@ -59,7 +60,7 @@ function ProductResult({ product, onSelect }: { product: Product; onSelect: () =
 }
 
 export default function App() {
-  const [view, setView] = useState<'lookup' | 'import' | 'photo-import'>('lookup');
+  const [view, setView] = useState<'lookup' | 'import' | 'photo-import' | 'manage'>('lookup');
   const [catalogState, setCatalogState] = useState<CatalogState>({ status: 'loading' });
   const [query, setQuery] = useState('');
   const [recents, setRecents] = useState<string[]>(readRecentQueries);
@@ -92,6 +93,10 @@ export default function App() {
   if (view === 'photo-import') {
     return <Suspense fallback={<main className="app-shell"><section className="state-panel"><RefreshCw className="spin" size={22} aria-hidden="true" /><p>正在打开照片识别</p></section></main>}><PhotoImportWorkspace baseCatalog={catalog} onBack={() => setView('lookup')} onCatalogPublished={(nextCatalog) => setCatalogState({ status: 'ready', catalog: nextCatalog })} onSpreadsheetImport={() => setView('import')} /></Suspense>;
   }
+
+  if (view === 'manage') {
+    return <Suspense fallback={<main className="app-shell"><section className="state-panel"><RefreshCw className="spin" size={22} aria-hidden="true" /><p>正在打开商品管理</p></section></main>}><ProductManagementWorkspace baseCatalog={catalog} onBack={() => setView('lookup')} onCatalogPublished={(nextCatalog) => setCatalogState({ status: 'ready', catalog: nextCatalog })} /></Suspense>;
+  }
   const results = catalog ? searchProducts(catalog.products, query) : [];
   const activeCount = catalog?.products.filter((product) => product.active).length ?? 0;
   const hasPublishedProducts = activeCount > 0;
@@ -119,10 +124,16 @@ export default function App() {
           <span className="brand-mark">价</span>
           <div><strong>小卖部查价</strong><span>内部价格查询</span></div>
         </div>
-        <button className="import-button" type="button" onClick={() => setView('import')} aria-label="导入价格表">
-          <FileUp size={18} aria-hidden="true" />
-          <span>导入价格表</span>
-        </button>
+        <div className="header-actions">
+          <button className="import-button" type="button" onClick={() => setView('manage')} aria-label="商品管理">
+            <PackageSearch size={18} aria-hidden="true" />
+            <span>商品管理</span>
+          </button>
+          <button className="import-button" type="button" onClick={() => setView('import')} aria-label="导入价格表">
+            <FileUp size={18} aria-hidden="true" />
+            <span>导入价格表</span>
+          </button>
+        </div>
       </header>
 
       <section className="lookup-stage" aria-labelledby="lookup-title">
