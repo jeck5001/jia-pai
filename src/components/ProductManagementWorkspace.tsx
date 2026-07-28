@@ -31,6 +31,10 @@ function issueKey(issue: ImportIssue, index: number): string {
   return `${issue.severity}-${issue.row ?? 'global'}-${index}`;
 }
 
+function productNameRows(name: string): number {
+  return Math.max(1, Math.ceil(Array.from(name).length / 9));
+}
+
 export function ProductManagementWorkspace({ baseCatalog, onBack, onCatalogPublished }: ProductManagementWorkspaceProps) {
   const [draft, setDraft] = useState<Product[]>(() => baseCatalog?.products ?? []);
   const [sourceLabel, setSourceLabel] = useState(() => baseCatalog?.sourceLabel ?? '');
@@ -187,7 +191,37 @@ export function ProductManagementWorkspace({ baseCatalog, onBack, onCatalogPubli
             </section>
           ) : null}
 
-          <div className="table-scroll">
+          <div className="manage-mobile-list">
+            {visibleProducts.map(({ product, index }) => (
+              <article key={product.id} className={errorProductIds.has(product.id) ? 'manage-mobile-product draft-row-error' : 'manage-mobile-product'}>
+                <div className="manage-mobile-product-heading">
+                  <span>商品 {index + 1}</span>
+                  <div>
+                    <label className="switch-label"><input type="checkbox" checked={product.active} onChange={(event) => updateProduct(index, { active: event.target.checked })} /><span>{product.active ? '上架' : '下架'}</span></label>
+                    <button className="icon-button danger" type="button" onClick={() => removeProduct(index)} aria-label={`删除商品：${product.name || '新商品'}`} title="删除商品"><X size={17} /></button>
+                  </div>
+                </div>
+                <label className="manage-mobile-field manage-mobile-field-wide">
+                  <span>商品名称</span>
+                  <textarea aria-label={`商品名称：${product.name || '新商品'}`} rows={productNameRows(product.name)} value={product.name} onChange={(event) => updateProduct(index, { name: event.target.value })} />
+                </label>
+                <div className="manage-mobile-field-grid">
+                  <label className="manage-mobile-field"><span>规格</span><input aria-label={`商品规格：${product.name || '新商品'}`} value={product.specification ?? ''} onChange={(event) => updateProduct(index, { specification: event.target.value || undefined })} /></label>
+                  <label className="manage-mobile-field"><span>Item ID</span><input aria-label={`商品 Item ID：${product.name || '新商品'}`} value={product.itemId ?? ''} onChange={(event) => updateProduct(index, { itemId: event.target.value || undefined })} /></label>
+                  <label className="manage-mobile-field"><span>零售价</span><input aria-label={`商品零售价：${product.name || '新商品'}`} inputMode="decimal" value={product.priceCents >= 0 ? priceForInput(product.priceCents) : ''} onChange={(event) => updateProduct(index, { priceCents: parsePriceToCents(event.target.value) ?? -1 })} /></label>
+                  <label className="manage-mobile-field"><span>库存</span><input aria-label={`商品库存：${product.name || '新商品'}`} inputMode="numeric" value={product.stockQuantity ?? ''} onChange={(event) => {
+                    const value = event.target.value.trim();
+                    const quantity = Number(value);
+                    updateProduct(index, { stockQuantity: value && Number.isFinite(quantity) && quantity >= 0 ? quantity : undefined });
+                  }} /></label>
+                </div>
+                <label className="manage-mobile-field manage-mobile-field-wide"><span>条码 / 别名</span><input aria-label={`商品条码和别名：${product.name || '新商品'}`} value={[...(product.barcodes ?? []), ...(product.aliases ?? [])].join(', ')} onChange={(event) => updateProduct(index, { barcodes: event.target.value.split(/[，,;；]/).map((value) => value.trim()).filter(Boolean), aliases: [] })} /></label>
+              </article>
+            ))}
+            {!visibleProducts.length ? <p className="manage-no-results">{draft.length ? '没有符合当前筛选条件的商品。' : '还没有商品，点击“新增商品”开始录入。'}</p> : null}
+          </div>
+
+          <div className="table-scroll manage-desktop-table">
             <table className="draft-table manage-table">
               <thead>
                 <tr>
@@ -204,7 +238,7 @@ export function ProductManagementWorkspace({ baseCatalog, onBack, onCatalogPubli
               <tbody>
                 {visibleProducts.map(({ product, index }) => (
                   <tr key={product.id} className={errorProductIds.has(product.id) ? 'draft-row-error' : undefined}>
-                    <td><input aria-label={`商品名称：${product.name || '新商品'}`} value={product.name} onChange={(event) => updateProduct(index, { name: event.target.value })} /></td>
+                    <td><textarea className="product-name-input" aria-label={`商品名称：${product.name || '新商品'}`} rows={productNameRows(product.name)} value={product.name} onChange={(event) => updateProduct(index, { name: event.target.value })} /></td>
                     <td><input aria-label={`商品规格：${product.name || '新商品'}`} value={product.specification ?? ''} onChange={(event) => updateProduct(index, { specification: event.target.value || undefined })} /></td>
                     <td><input aria-label={`商品 Item ID：${product.name || '新商品'}`} value={product.itemId ?? ''} onChange={(event) => updateProduct(index, { itemId: event.target.value || undefined })} /></td>
                     <td><input aria-label={`商品零售价：${product.name || '新商品'}`} inputMode="decimal" value={product.priceCents >= 0 ? priceForInput(product.priceCents) : ''} onChange={(event) => updateProduct(index, { priceCents: parsePriceToCents(event.target.value) ?? -1 })} /></td>
