@@ -41,6 +41,7 @@ function readConfig(overrides = {}) {
   return {
     adminToken: overrides.adminToken ?? process.env.ADMIN_TOKEN?.trim() ?? '',
     dataDir: overrides.dataDir ?? process.env.DATA_DIR ?? join(PROJECT_DIR, 'data'),
+    fetchImpl: overrides.fetchImpl ?? globalThis.fetch,
     port: Number(overrides.port ?? process.env.PORT ?? 3000),
     sub2ApiBaseUrl: overrides.sub2ApiBaseUrl ?? process.env.SUB2API_BASE_URL?.trim() ?? 'http://192.168.5.35:8084/',
     sub2ApiKey: overrides.sub2ApiKey ?? process.env.SUB2API_API_KEY?.trim() ?? '',
@@ -64,6 +65,27 @@ function asString(value) {
   if (typeof value !== 'string' && typeof value !== 'number') return undefined;
   const result = String(value).trim();
   return result || undefined;
+}
+
+function serviceOrigin(endpoint) {
+  return new URL(endpoint).origin;
+}
+
+function networkFailureDetails(error) {
+  const cause = error && typeof error === 'object' ? error.cause : undefined;
+  return {
+    code: asString(cause?.code) ?? asString(error?.code),
+    type: asString(cause?.name) ?? asString(error?.name) ?? 'UnknownError',
+  };
+}
+
+function networkFailureMessage(details) {
+  if (details.code === 'ECONNREFUSED') return '无法连接 Sub2API 服务（ECONNREFUSED，连接被拒绝）。请检查 NAS 到服务地址的端口和路由。';
+  if (details.code === 'ENOTFOUND') return '无法连接 Sub2API 服务（ENOTFOUND，地址无法解析）。请检查服务地址。';
+  if (details.code === 'ETIMEDOUT' || details.code === 'UND_ERR_CONNECT_TIMEOUT' || details.type === 'TimeoutError') {
+    return '连接 Sub2API 服务超时。请检查 NAS 到服务地址的网络连通性。';
+  }
+  return '无法连接 Sub2API 服务。请查看 NAS 容器日志中的 [vision] 记录。';
 }
 
 function visionResponseText(payload) {
@@ -227,9 +249,10 @@ async function recognizeWithSub2Api(imageUrl, config) {
   }
   if (!config.sub2ApiKey) throw new HttpError(503, '服务端未配置 SUB2API_API_KEY');
 
+  const endpoint = completionUrl(config.sub2ApiBaseUrl);
   let upstream;
   try {
-    upstream = await fetch(completionUrl(config.sub2ApiBaseUrl), {
+    upstream = await config.fetchImpl(endpoint, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${config.sub2ApiKey}`,
@@ -251,13 +274,23 @@ async function recognizeWithSub2Api(imageUrl, config) {
       }),
       signal: AbortSignal.timeout(90_000),
     });
-  } catch {
-    throw new HttpError(502, '无法连接 Sub2API 服务');
+  } catch (error) {
+    const details = networkFailureDetails(error);
+    console.error('[vision] Sub2API connection failed', {
+      endpoint: serviceOrigin(endpoint),
+      errorCode: details.code ?? 'UNKNOWN',
+      errorType: details.type,
+    });
+    throw new HttpError(502, networkFailureMessage(details));
   }
 
   const payload = await upstream.json().catch(() => null);
   if (!upstream.ok) {
     const message = isRecord(payload) && isRecord(payload.error) ? asString(payload.error.message) : undefined;
+    console.warn('[vision] Sub2API returned an error response', {
+      endpoint: serviceOrigin(endpoint),
+      status: upstream.status,
+    });
     throw new HttpError(502, message ? `Sub2API 请求失败：${message}` : `Sub2API 请求失败（HTTP ${upstream.status}）`);
   }
   return visionResponseText(payload);

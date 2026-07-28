@@ -26,6 +26,22 @@ docker compose ps
 curl http://127.0.0.1:3000/api/health
 ```
 
+## 图片识别故障排查
+
+查看服务日志：
+
+```bash
+docker compose logs --tail=200 -f xiaomaibu
+```
+
+页面提示无法连接 Sub2API 时，在 NAS 上执行下面的命令测试容器到 Sub2API 的连通性。它不会输出 API Key：
+
+```bash
+docker exec xiaomaibu-price-checker node --input-type=module -e 'const base = (process.env.SUB2API_BASE_URL || "").replace(/\/+$/, ""); const url = `${base}${/\/v1$/i.test(base) ? "" : "/v1"}/models`; try { const response = await fetch(url, { headers: { Authorization: `Bearer ${process.env.SUB2API_API_KEY}` } }); console.log(JSON.stringify({ url, status: response.status })); } catch (error) { console.error(JSON.stringify({ url, name: error.name, message: error.message, code: error.cause?.code })); process.exit(1); }'
+```
+
+`status` 为 `200` 或 `401` 说明网络已通；`ECONNREFUSED` 表示端口或服务未开放，`ENOTFOUND` 表示地址/DNS 错误，超时通常表示 NAS 与 Sub2API 不在可达网络或被防火墙拦截。
+
 第一次启动会在 `data/products.json` 创建空价格表。通过页面导入表格或照片并点击“发布到 NAS”后，数据会直接写入这个持久化文件。备份时可复制 `data/products.json`，恢复后执行 `docker compose restart`。
 
 GitHub `main` 每次推送都会自动构建 `latest` 镜像。升级 NAS 服务：
