@@ -203,6 +203,8 @@ h2 { margin-bottom: 0; font-size: 19px; letter-spacing: 0; }
 .preview-results p { display: flex; justify-content: space-between; gap: 16px; margin: 0; padding: 12px 0; border-bottom: 1px solid #dfe6e1; font-size: 14px; }
 .preview-results p span { color: #b34234; font-weight: 750; }
 .success-notice { margin-top: 22px; }
+.publish-notice { margin: 14px 0 0; padding: 11px 13px; color: #195941; background: #e7f0e9; border-left: 3px solid #257051; font-size: 14px; line-height: 1.5; }
+.publish-notice-error { color: #9b3d32; background: #faece9; border-left-color: #b34234; }
 
 .manage-controls { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(180px, 1fr) minmax(210px, 1.2fr); gap: 12px; align-items: end; padding: 22px 0; border-bottom: 1px solid #d9e1dc; }
 .manage-controls > label { display: grid; gap: 7px; color: #55615c; font-size: 13px; font-weight: 700; }

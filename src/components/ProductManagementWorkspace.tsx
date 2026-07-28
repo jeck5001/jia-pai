@@ -186,9 +186,8 @@ export function ProductManagementWorkspace({ baseCatalog, onBack, onCatalogPubli
             </div>
           </section>
 
-          {issues.length || publishError ? (
+          {issues.length ? (
             <section className="issue-list" aria-live="polite">
-              {publishError ? <p className="issue-error">{publishError}</p> : null}
               {issues.map((issue, index) => <p key={issueKey(issue, index)} className={issue.severity === 'error' ? 'issue-error' : 'issue-warning'}>{issue.message}</p>)}
             </section>
           ) : null}
@@ -269,7 +268,8 @@ export function ProductManagementWorkspace({ baseCatalog, onBack, onCatalogPubli
               {isPublishing ? '正在发布' : '保存并发布'}
             </button>
           </section>
-          {status ? <p className="success-notice" role="status">{status}</p> : null}
+          {publishError ? <p className="publish-notice publish-notice-error" role="alert">{publishError}</p> : null}
+          {status ? <p className="publish-notice" role="status">{status}</p> : null}
         </>
       )}
     </main>

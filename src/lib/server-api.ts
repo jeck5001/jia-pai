@@ -44,14 +44,19 @@ export async function fetchCatalog(): Promise<Catalog> {
 }
 
 export async function publishCatalog(catalog: Catalog, adminToken: string): Promise<Catalog> {
-  const response = await fetch(apiUrl('/api/catalog'), {
-    method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(adminToken.trim() ? { 'X-Admin-Token': adminToken.trim() } : {}),
-    },
-    body: JSON.stringify(catalog),
-  });
+  let response: Response;
+  try {
+    response = await fetch(apiUrl('/api/catalog'), {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(adminToken.trim() ? { 'X-Admin-Token': adminToken.trim() } : {}),
+      },
+      body: JSON.stringify(catalog),
+    });
+  } catch {
+    throw new Error('无法连接 NAS 服务，请检查网络、NAS 地址和服务状态。');
+  }
   if (!response.ok) throw new Error(await readError(response, '价格表发布失败'));
   return response.json() as Promise<Catalog>;
 }
