@@ -70,6 +70,8 @@ button:disabled { cursor: not-allowed; opacity: .48; }
 }
 .import-button { padding: 0 9px; }
 .import-button:hover, .back-button:hover, .text-button:hover { background: #e7eeea; }
+.management-button { background: #e7eeea; }
+.management-button:hover { background: #d6e5dd; }
 
 .lookup-stage { padding-top: clamp(58px, 12vh, 130px); animation: rise .45s ease both; }
 .lookup-heading { max-width: 600px; }
@@ -235,6 +237,8 @@ h2 { margin-bottom: 0; font-size: 19px; letter-spacing: 0; }
   .brand-lockup > div span { display: none; }
   .import-button { width: 40px; padding: 0; }
   .import-button span { display: none; }
+  .import-button.management-button { width: auto; padding: 0 9px; }
+  .import-button.management-button span { display: inline; }
   .header-actions { gap: 1px; }
   .lookup-stage { padding-top: 72px; }
   h1 { font-size: 34px; }
