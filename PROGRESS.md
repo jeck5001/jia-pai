@@ -19,3 +19,4 @@
 - 已完成：新增地址解析单测；网页端固定保留相对 `/api`，原生端保存并验证 NAS 根地址后才使用绝对 API 地址。
 - 已完成：新增 GitHub Android 工作流，云端执行测试、Web 构建、Capacitor 同步、`assembleDebug lintDebug`、APK 身份和权限校验，上传 30 天 APK Artifact。
 - 反向验证：临时将新增地址测试改为允许非法地址后，`npm run test -- src/lib/app-config.test.ts` 如预期为 1 个文件失败、4 项失败，覆盖 `ftp://...` 和带 `?debug=1` 的地址；还原断言后同一命令为 1 个文件、7 项全绿。
+- CI 第 1 次构建：`assembleDebug` 已成功，`lintDebug` 因 CAMERA 权限缺少非必需硬件声明失败；已补 `android.hardware.camera required=false`，不使用 lint baseline 或关闭 lint 绕过。
