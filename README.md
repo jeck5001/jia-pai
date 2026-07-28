@@ -11,7 +11,7 @@
 
 1. 在 NAS 中创建部署目录，例如 `/vol1/1000/xiaomaibu-price-checker`，只需放入本仓库的 `compose.yaml` 和 `.env.example`。
 2. 复制环境模板：`cp .env.example .env`。
-3. 编辑 `.env`，填写 `SUB2API_API_KEY`；建议同时设置随机的 `ADMIN_TOKEN`。内网 Sub2API 地址和视觉模型已有默认值，可按实际环境修改。
+3. 编辑 `.env`，填写 `SUB2API_API_KEY`；建议同时设置随机的 `ADMIN_TOKEN`。内网 Sub2API 地址、视觉模型和 `SUB2API_TIMEOUT_MS` 已有默认值；默认单张图片最多等待 3 分钟，可按实际模型速度修改。
 4. 在飞牛的终端或 Compose 管理界面执行：
 
 ```bash
@@ -40,7 +40,7 @@ docker compose logs --tail=200 -f xiaomaibu
 docker exec xiaomaibu-price-checker node --input-type=module -e 'const base = (process.env.SUB2API_BASE_URL || "").replace(/\/+$/, ""); const url = `${base}${/\/v1$/i.test(base) ? "" : "/v1"}/models`; try { const response = await fetch(url, { headers: { Authorization: `Bearer ${process.env.SUB2API_API_KEY}` } }); console.log(JSON.stringify({ url, status: response.status })); } catch (error) { console.error(JSON.stringify({ url, name: error.name, message: error.message, code: error.cause?.code })); process.exit(1); }'
 ```
 
-`status` 为 `200` 或 `401` 说明网络已通；`ECONNREFUSED` 表示端口或服务未开放，`ENOTFOUND` 表示地址/DNS 错误，超时通常表示 NAS 与 Sub2API 不在可达网络或被防火墙拦截。
+`status` 为 `200` 或 `401` 说明网络已通；`ECONNREFUSED` 表示端口或服务未开放，`ENOTFOUND` 表示地址/DNS 错误。日志中的 `timeoutMs` 是本次请求实际允许的最长时间；超时通常表示 NAS 与 Sub2API 不在可达网络、被防火墙拦截，或模型处理时间超过该值。
 
 第一次启动会在 `data/products.json` 创建空价格表。通过页面导入表格或照片并点击“发布到 NAS”后，数据会直接写入这个持久化文件。备份时可复制 `data/products.json`，恢复后执行 `docker compose restart`。
 
