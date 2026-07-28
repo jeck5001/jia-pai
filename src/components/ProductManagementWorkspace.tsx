@@ -1,4 +1,4 @@
-import { Plus, RefreshCw, RotateCcw, Save, Search, X } from 'lucide-react';
+import { AlertCircle, AlertTriangle, CheckCircle2, Plus, RefreshCw, RotateCcw, Save, Search, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { normalizeText, productSearchText, priceForInput, parsePriceToCents, uniqueProducts, validateProducts } from '../lib/catalog';
 import { createManagedCatalog, createManagedProduct } from '../lib/catalog-management';
@@ -131,6 +131,7 @@ export function ProductManagementWorkspace({ baseCatalog, onBack, onCatalogPubli
 
       {!baseCatalog ? (
         <section className="state-panel state-error manage-empty-state">
+          <AlertCircle size={24} aria-hidden="true" />
           <p>未能读取当前商品目录，请返回查价页刷新后再管理。</p>
         </section>
       ) : (
@@ -144,11 +145,11 @@ export function ProductManagementWorkspace({ baseCatalog, onBack, onCatalogPubli
           </section>
 
           <section className="manage-controls" aria-label="目录发布信息">
-            <label>
+            <label className="field">
               <span>价格表来源</span>
               <input value={sourceLabel} onChange={(event) => { setSourceLabel(event.target.value); setStatus(''); }} maxLength={80} />
             </label>
-            <label>
+            <label className="field">
               <span>生效时间</span>
               <input type="datetime-local" value={effectiveAt} onChange={(event) => { setEffectiveAt(event.target.value); setStatus(''); }} />
             </label>
@@ -183,46 +184,76 @@ export function ProductManagementWorkspace({ baseCatalog, onBack, onCatalogPubli
                 <Plus size={18} aria-hidden="true" />
                 新增商品
               </button>
+              <label className="admin-token-field">
+                <span>管理员口令</span>
+                <input type="password" value={adminToken} onChange={(event) => setAdminToken(event.target.value)} placeholder="未设置可留空" autoComplete="off" disabled={isPublishing} />
+              </label>
+              <button className="primary-button" type="button" onClick={() => void publishManagedCatalog()} disabled={hasErrors || isPublishing}>
+                {isPublishing ? <RefreshCw className="spin" size={18} aria-hidden="true" /> : <Save size={18} aria-hidden="true" />}
+                {isPublishing ? '正在发布' : '保存并发布'}
+              </button>
             </div>
           </section>
+          {publishError ? (
+            <p className="notice notice-error publish-notice" role="alert">
+              <AlertCircle size={18} aria-hidden="true" />
+              <span>{publishError}</span>
+            </p>
+          ) : null}
+          {status ? (
+            <p className="notice notice-success publish-notice" role="status">
+              <CheckCircle2 size={18} aria-hidden="true" />
+              <span>{status}</span>
+            </p>
+          ) : null}
 
           {issues.length ? (
             <section className="issue-list" aria-live="polite">
-              {issues.map((issue, index) => <p key={issueKey(issue, index)} className={issue.severity === 'error' ? 'issue-error' : 'issue-warning'}>{issue.message}</p>)}
+              {issues.map((issue, index) => (
+                <p key={issueKey(issue, index)} className={issue.severity === 'error' ? 'issue-error' : 'issue-warning'}>
+                  {issue.severity === 'error' ? <AlertCircle size={17} aria-hidden="true" /> : <AlertTriangle size={17} aria-hidden="true" />}
+                  <span>{issue.message}</span>
+                </p>
+              ))}
             </section>
           ) : null}
 
-          <div className="manage-mobile-list">
+          <div className="draft-cards">
             {visibleProducts.map(({ product, index }) => (
-              <article key={product.id} className={errorProductIds.has(product.id) ? 'manage-mobile-product draft-row-error' : 'manage-mobile-product'}>
-                <div className="manage-mobile-product-heading">
+              <article key={product.id} className={errorProductIds.has(product.id) ? 'draft-card draft-row-error' : 'draft-card'}>
+                <div className="draft-card-heading">
                   <span>商品 {index + 1}</span>
                   <div>
                     <label className="switch-label"><input type="checkbox" checked={product.active} onChange={(event) => updateProduct(index, { active: event.target.checked })} /><span>{product.active ? '上架' : '下架'}</span></label>
-                    <button className="icon-button danger" type="button" onClick={() => removeProduct(index)} aria-label={`删除商品：${product.name || '新商品'}`} title="删除商品"><X size={17} /></button>
+                    <button className="icon-button danger" type="button" onClick={() => removeProduct(index)} aria-label={`删除商品：${product.name || '新商品'}`} title="删除商品"><X size={18} /></button>
                   </div>
                 </div>
-                <label className="manage-mobile-field manage-mobile-field-wide">
+                <label className="draft-field">
                   <span>商品名称</span>
                   <textarea aria-label={`商品名称：${product.name || '新商品'}`} rows={productNameRows(product.name)} value={product.name} onChange={(event) => updateProduct(index, { name: event.target.value })} />
                 </label>
-                <div className="manage-mobile-field-grid">
-                  {hasSpecifications ? <label className="manage-mobile-field"><span>规格</span><input aria-label={`商品规格：${product.name || '新商品'}`} value={product.specification ?? ''} onChange={(event) => updateProduct(index, { specification: event.target.value || undefined })} /></label> : null}
-                  <label className="manage-mobile-field"><span>Item ID</span><input aria-label={`商品 Item ID：${product.name || '新商品'}`} value={product.itemId ?? ''} onChange={(event) => updateProduct(index, { itemId: event.target.value || undefined })} /></label>
-                  <label className="manage-mobile-field"><span>零售价</span><input aria-label={`商品零售价：${product.name || '新商品'}`} inputMode="decimal" value={product.priceCents >= 0 ? priceForInput(product.priceCents) : ''} onChange={(event) => updateProduct(index, { priceCents: parsePriceToCents(event.target.value) ?? -1 })} /></label>
-                  <label className="manage-mobile-field"><span>库存</span><input aria-label={`商品库存：${product.name || '新商品'}`} inputMode="numeric" value={product.stockQuantity ?? ''} onChange={(event) => {
+                <div className="draft-field-grid">
+                  {hasSpecifications ? <label className="draft-field"><span>规格</span><input aria-label={`商品规格：${product.name || '新商品'}`} value={product.specification ?? ''} onChange={(event) => updateProduct(index, { specification: event.target.value || undefined })} /></label> : null}
+                  <label className="draft-field"><span>Item ID</span><input aria-label={`商品 Item ID：${product.name || '新商品'}`} value={product.itemId ?? ''} onChange={(event) => updateProduct(index, { itemId: event.target.value || undefined })} /></label>
+                  <label className="draft-field"><span>零售价</span><input aria-label={`商品零售价：${product.name || '新商品'}`} inputMode="decimal" value={product.priceCents >= 0 ? priceForInput(product.priceCents) : ''} onChange={(event) => updateProduct(index, { priceCents: parsePriceToCents(event.target.value) ?? -1 })} /></label>
+                  <label className="draft-field"><span>库存</span><input aria-label={`商品库存：${product.name || '新商品'}`} inputMode="numeric" value={product.stockQuantity ?? ''} onChange={(event) => {
                     const value = event.target.value.trim();
                     const quantity = Number(value);
                     updateProduct(index, { stockQuantity: value && Number.isFinite(quantity) && quantity >= 0 ? quantity : undefined });
                   }} /></label>
                 </div>
-                {hasBarcodesOrAliases ? <label className="manage-mobile-field manage-mobile-field-wide"><span>条码 / 别名</span><input aria-label={`商品条码和别名：${product.name || '新商品'}`} value={[...(product.barcodes ?? []), ...(product.aliases ?? [])].join(', ')} onChange={(event) => updateProduct(index, { barcodes: event.target.value.split(/[，,;；]/).map((value) => value.trim()).filter(Boolean), aliases: [] })} /></label> : null}
+                {hasBarcodesOrAliases ? (
+                  <label className="draft-field">
+                    <span>条码 / 别名</span>
+                    <input aria-label={`商品条码和别名：${product.name || '新商品'}`} value={[...(product.barcodes ?? []), ...(product.aliases ?? [])].join(', ')} onChange={(event) => updateProduct(index, { barcodes: event.target.value.split(/[，,;；]/).map((value) => value.trim()).filter(Boolean), aliases: [] })} />
+                  </label>
+                ) : null}
               </article>
             ))}
             {!visibleProducts.length ? <p className="manage-no-results">{draft.length ? '没有符合当前筛选条件的商品。' : '还没有商品，点击“新增商品”开始录入。'}</p> : null}
           </div>
 
-          <div className="table-scroll manage-desktop-table">
+          <div className="table-scroll">
             <table className="draft-table manage-table">
               <thead>
                 <tr>
@@ -257,19 +288,6 @@ export function ProductManagementWorkspace({ baseCatalog, onBack, onCatalogPubli
               </tbody>
             </table>
           </div>
-
-          <section className="manage-publish-bar" aria-label="发布商品目录">
-            <label className="admin-token-field">
-              <span>管理员口令</span>
-              <input type="password" value={adminToken} onChange={(event) => setAdminToken(event.target.value)} placeholder="未设置可留空" autoComplete="off" disabled={isPublishing} />
-            </label>
-            <button className="primary-button" type="button" onClick={() => void publishManagedCatalog()} disabled={hasErrors || isPublishing}>
-              {isPublishing ? <RefreshCw className="spin" size={18} aria-hidden="true" /> : <Save size={18} aria-hidden="true" />}
-              {isPublishing ? '正在发布' : '保存并发布'}
-            </button>
-          </section>
-          {publishError ? <p className="publish-notice publish-notice-error" role="alert">{publishError}</p> : null}
-          {status ? <p className="publish-notice" role="status">{status}</p> : null}
         </>
       )}
     </main>

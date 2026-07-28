@@ -1,5 +1,5 @@
 import { Capacitor } from '@capacitor/core';
-import { Barcode, FileUp, History, PackageSearch, RefreshCw, Search, Settings, ShoppingBasket } from 'lucide-react';
+import { AlertCircle, AlertTriangle, Barcode, CheckCircle2, FileUp, History, PackageSearch, RefreshCw, Search, Settings, ShoppingBasket } from 'lucide-react';
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { readNasServerUrl, saveNasServerUrl } from './lib/app-config';
 import { formatPrice, isPublishedCatalog, searchProducts } from './lib/catalog';
@@ -52,10 +52,10 @@ function ProductResult({ product, onSelect }: { product: Product; onSelect: () =
 
   return (
     <button className="product-result" type="button" onClick={onSelect}>
-      <div className="product-copy">
+      <span className="product-copy">
         <strong>{product.name}</strong>
         <span>{details || '规格未标注'}</span>
-      </div>
+      </span>
       <span className="product-price">{formatPrice(product.priceCents)}</span>
     </button>
   );
@@ -68,7 +68,7 @@ export default function App() {
   const [query, setQuery] = useState('');
   const [recents, setRecents] = useState<string[]>(readRecentQueries);
   const [scannerOpen, setScannerOpen] = useState(false);
-  const [scannerNotice, setScannerNotice] = useState('');
+  const [scannerNotice, setScannerNotice] = useState<{ kind: 'success' | 'warning'; text: string } | null>(null);
   const [nasServerUrl, setNasServerUrl] = useState(() => readNasServerUrl(isNativePlatform, window.localStorage));
   const [nasServerInput, setNasServerInput] = useState(() => nasServerUrl ?? '');
   const [nasSettingsOpen, setNasSettingsOpen] = useState(() => isNativePlatform && !nasServerUrl);
@@ -124,7 +124,7 @@ export default function App() {
 
   if (isNativePlatform && (!nasServerUrl || nasSettingsOpen)) {
     return (
-      <main className="app-shell nas-config-shell">
+      <main className="app-shell lookup-shell nas-config-shell">
         <header className="app-header">
           <div className="brand-lockup">
             <span className="brand-mark">价</span>
@@ -149,8 +149,18 @@ export default function App() {
             />
           </label>
           <p className="nas-config-note">支持 HTTP 或 HTTPS。HTTP 仅适用于公司可信内网。</p>
-          {nasConnectionError ? <p className="nas-config-error" role="alert">{nasConnectionError}</p> : null}
-          {nasConnectionStatus ? <p className="success-notice" role="status">{nasConnectionStatus}</p> : null}
+          {nasConnectionError ? (
+            <p className="notice notice-error nas-config-error" role="alert">
+              <AlertCircle size={18} aria-hidden="true" />
+              <span>{nasConnectionError}</span>
+            </p>
+          ) : null}
+          {nasConnectionStatus ? (
+            <p className="notice notice-success" role="status">
+              <CheckCircle2 size={18} aria-hidden="true" />
+              <span>{nasConnectionStatus}</span>
+            </p>
+          ) : null}
           <div className="nas-config-actions">
             {nasServerUrl ? <button className="text-button" type="button" onClick={() => setNasSettingsOpen(false)} disabled={isCheckingNasConnection}>取消</button> : null}
             <button className="primary-button" type="button" onClick={() => void testAndSaveNasServer()} disabled={isCheckingNasConnection}>
@@ -180,7 +190,7 @@ export default function App() {
 
   function chooseQuery(nextQuery: string) {
     setQuery(nextQuery);
-    setScannerNotice('');
+    setScannerNotice(null);
   }
 
   function selectProduct() {
@@ -191,41 +201,51 @@ export default function App() {
     setScannerOpen(false);
     setQuery(code);
     const matched = catalog ? searchProducts(catalog.products, code).length > 0 : false;
-    setScannerNotice(matched ? `已识别条码 ${code}` : `条码 ${code} 未在当前价格表中匹配，请改用名称搜索。`);
+    setScannerNotice(
+      matched
+        ? { kind: 'success', text: `已识别条码 ${code}` }
+        : { kind: 'warning', text: `条码 ${code} 未在当前价格表中匹配，请改用名称搜索。` },
+    );
   }
 
   return (
-    <main className="app-shell">
+    <main className="app-shell lookup-shell">
       <header className="app-header">
         <div className="brand-lockup">
           <span className="brand-mark">价</span>
           <div><strong>小卖部查价</strong><span>内部价格查询</span></div>
         </div>
         <div className="header-actions">
-          {isNativePlatform ? <button className="import-button" type="button" onClick={openNasSettings} aria-label="NAS 设置" title="NAS 设置"><Settings size={18} aria-hidden="true" /><span>NAS 设置</span></button> : null}
-          <button className="import-button management-button" type="button" onClick={() => setView('manage')} aria-label="商品管理" title="商品管理">
-            <PackageSearch size={18} aria-hidden="true" />
+          {isNativePlatform ? <button className="header-button" type="button" onClick={openNasSettings} aria-label="NAS 设置" title="NAS 设置"><Settings size={19} aria-hidden="true" /><span>NAS 设置</span></button> : null}
+          <button className="header-button" type="button" onClick={() => setView('manage')} aria-label="商品管理" title="商品管理">
+            <PackageSearch size={19} aria-hidden="true" />
             <span>商品管理</span>
           </button>
-          <button className="import-button" type="button" onClick={() => setView('import')} aria-label="导入价格表" title="导入价格表">
-            <FileUp size={18} aria-hidden="true" />
+          <button className="header-button" type="button" onClick={() => setView('import')} aria-label="导入价格表" title="导入价格表">
+            <FileUp size={19} aria-hidden="true" />
             <span>导入价格表</span>
           </button>
         </div>
       </header>
 
-      {nasConnectionStatus ? <p className="nas-connection-notice success-notice" role="status">{nasConnectionStatus}</p> : null}
+      {nasConnectionStatus ? (
+        <p className="notice notice-success nas-connection-notice" role="status">
+          <CheckCircle2 size={18} aria-hidden="true" />
+          <span>{nasConnectionStatus}</span>
+        </p>
+      ) : null}
 
       <section className="lookup-stage" aria-labelledby="lookup-title">
         <div className="lookup-heading">
-          <span className="eyebrow">图片报价汇总</span>
           <h1 id="lookup-title">查商品价格</h1>
-          <p>{catalog ? `${catalog.sourceLabel} · ${displayDate(catalog.effectiveAt)}` : '正在读取已发布价格表'}</p>
+          <p className="catalog-meta">
+            {catalog ? `${catalog.sourceLabel} · ${displayDate(catalog.effectiveAt)} · ${activeCount} 条在售` : '正在读取已发布价格表'}
+          </p>
         </div>
 
         <div className="search-row">
           <label className="search-box">
-            <Search size={21} aria-hidden="true" />
+            <Search size={22} aria-hidden="true" />
             <input
               autoFocus
               value={query}
@@ -236,15 +256,20 @@ export default function App() {
             {query ? <button className="clear-query" type="button" onClick={() => chooseQuery('')} aria-label="清除搜索"><span>×</span></button> : null}
           </label>
           <button className="scan-button" type="button" onClick={() => setScannerOpen(true)} title="扫码查询">
-            <Barcode size={21} aria-hidden="true" />
+            <Barcode size={22} aria-hidden="true" />
             <span>扫码</span>
           </button>
         </div>
 
-        {scannerNotice ? <p className="scanner-notice" role="status">{scannerNotice}</p> : null}
+        {scannerNotice ? (
+          <p className={`notice scanner-notice ${scannerNotice.kind === 'success' ? 'notice-success' : 'notice-warning'}`} role="status">
+            {scannerNotice.kind === 'success' ? <CheckCircle2 size={18} aria-hidden="true" /> : <AlertTriangle size={18} aria-hidden="true" />}
+            <span>{scannerNotice.text}</span>
+          </p>
+        ) : null}
 
         {catalogState.status === 'loading' ? <section className="state-panel"><RefreshCw className="spin" size={22} aria-hidden="true" /><p>正在读取价格表</p></section> : null}
-        {catalogState.status === 'error' ? <section className="state-panel state-error"><p>无法加载价格表，请刷新页面或联系管理员。</p></section> : null}
+        {catalogState.status === 'error' ? <section className="state-panel state-error"><AlertCircle size={24} aria-hidden="true" /><p>无法加载价格表，请刷新页面或联系管理员。</p></section> : null}
         {catalogState.status === 'ready' && !hasPublishedProducts ? <section className="state-panel"><ShoppingBasket size={24} aria-hidden="true" /><p>尚未导入已发布价格表</p></section> : null}
 
         {catalogState.status === 'ready' && hasPublishedProducts && query ? (
@@ -256,7 +281,7 @@ export default function App() {
 
         {catalogState.status === 'ready' && hasPublishedProducts && !query ? (
           <section className="recent-section">
-            <div className="section-label"><History size={17} aria-hidden="true" /><span>最近查询</span></div>
+            <div className="section-label"><History size={16} aria-hidden="true" /><span>最近查询</span></div>
             {recents.length ? <div className="recent-list">{recents.map((recent) => <button key={recent} type="button" onClick={() => chooseQuery(recent)}>{recent}</button>)}</div> : <p className="muted-copy">开始输入商品名称或扫描包装条码</p>}
           </section>
         ) : null}
