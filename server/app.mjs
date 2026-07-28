@@ -9,6 +9,7 @@ const PROJECT_DIR = resolve(SERVER_DIR, '..');
 const DEFAULT_WEB_ROOT = join(PROJECT_DIR, 'dist');
 const MAX_CATALOG_BYTES = 5 * 1024 * 1024;
 const MAX_VISION_BYTES = 15 * 1024 * 1024;
+const DEFAULT_SUB2API_TIMEOUT_MS = 180_000;
 
 const EXTRACTION_PROMPT = `你是小卖部价格表的结构化识别器。请读取图片中完整可见的价格表，识别每个商品行的 Item ID、商品名称、数量和零售价。
 
@@ -37,6 +38,11 @@ class HttpError extends Error {
   }
 }
 
+function readTimeoutMs(value) {
+  const timeoutMs = Number(value);
+  return Number.isSafeInteger(timeoutMs) && timeoutMs >= 1_000 ? timeoutMs : DEFAULT_SUB2API_TIMEOUT_MS;
+}
+
 function readConfig(overrides = {}) {
   return {
     adminToken: overrides.adminToken ?? process.env.ADMIN_TOKEN?.trim() ?? '',
@@ -46,6 +52,7 @@ function readConfig(overrides = {}) {
     sub2ApiBaseUrl: overrides.sub2ApiBaseUrl ?? process.env.SUB2API_BASE_URL?.trim() ?? 'http://192.168.5.35:8084/',
     sub2ApiKey: overrides.sub2ApiKey ?? process.env.SUB2API_API_KEY?.trim() ?? '',
     sub2ApiModel: overrides.sub2ApiModel ?? process.env.SUB2API_MODEL?.trim() ?? 'gpt-5.5',
+    sub2ApiTimeoutMs: readTimeoutMs(overrides.sub2ApiTimeoutMs ?? process.env.SUB2API_TIMEOUT_MS),
     webRoot: overrides.webRoot ?? process.env.WEB_ROOT ?? DEFAULT_WEB_ROOT,
   };
 }
@@ -272,7 +279,7 @@ async function recognizeWithSub2Api(imageUrl, config) {
           },
         ],
       }),
-      signal: AbortSignal.timeout(90_000),
+      signal: AbortSignal.timeout(config.sub2ApiTimeoutMs),
     });
   } catch (error) {
     const details = networkFailureDetails(error);
@@ -280,6 +287,7 @@ async function recognizeWithSub2Api(imageUrl, config) {
       endpoint: serviceOrigin(endpoint),
       errorCode: details.code ?? 'UNKNOWN',
       errorType: details.type,
+      timeoutMs: config.sub2ApiTimeoutMs,
     });
     throw new HttpError(502, networkFailureMessage(details));
   }

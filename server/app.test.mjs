@@ -15,18 +15,31 @@ afterEach(async () => {
 async function runningApp(options = {}) {
   const dataDir = await mkdtemp(join(tmpdir(), 'xiaomaibu-server-'));
   temporaryDirectories.push(dataDir);
-  const { server } = await createApp({ dataDir, adminToken: 'publish-token', ...options });
+  const { config, server } = await createApp({ dataDir, adminToken: 'publish-token', ...options });
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   const address = server.address();
   const baseUrl = `http://127.0.0.1:${address.port}`;
   return {
     baseUrl,
+    config,
     dataDir,
     close: () => new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve())),
   };
 }
 
 describe('一体化服务', () => {
+  it('支持通过环境配置覆盖视觉模型请求超时，并对无效值回退到三分钟', async () => {
+    const configuredApp = await runningApp({ sub2ApiTimeoutMs: 240_000 });
+    const fallbackApp = await runningApp({ sub2ApiTimeoutMs: 0 });
+    try {
+      expect(configuredApp.config.sub2ApiTimeoutMs).toBe(240_000);
+      expect(fallbackApp.config.sub2ApiTimeoutMs).toBe(180_000);
+    } finally {
+      await configuredApp.close();
+      await fallbackApp.close();
+    }
+  });
+
   it('在数据目录初始化空价格表，并仅允许持有管理员口令的发布请求更新它', async () => {
     const app = await runningApp();
     try {
@@ -100,6 +113,7 @@ describe('一体化服务', () => {
         endpoint: 'http://sub2api.example:8084',
         errorCode: 'ECONNREFUSED',
         errorType: 'Error',
+        timeoutMs: 180_000,
       });
     } finally {
       await app.close();
