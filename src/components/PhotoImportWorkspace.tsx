@@ -209,7 +209,7 @@ export function PhotoImportWorkspace({ baseCatalog, onBack, onCatalogPublished, 
 
       <section className="photo-controls" aria-label="价格表照片导入">
         <label className="file-picker photo-picker" title="拍照或选择价格表照片">
-          <input type="file" accept="image/*" capture="environment" multiple onChange={handleImageChange} disabled={isRecognizing} />
+          <input type="file" accept="image/*" multiple onChange={handleImageChange} disabled={isRecognizing} />
           {isRecognizing ? <RefreshCw className="spin" size={18} aria-hidden="true" /> : <Camera size={18} aria-hidden="true" />}
           <span>{isRecognizing ? '正在识别' : '拍照或选择图片'}</span>
         </label>
