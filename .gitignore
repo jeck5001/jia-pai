@@ -1,0 +1,9 @@
+node_modules/
+dist/
+/data/
+.env
+AGENTS.md
+*.jpg
+coverage/
+*.tsbuildinfo
+.DS_Store

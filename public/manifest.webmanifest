@@ -1,0 +1,17 @@
+{
+  "name": "小卖部查价",
+  "short_name": "小卖部查价",
+  "description": "小卖部商品价格查询",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f7f8f6",
+  "theme_color": "#114338",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
