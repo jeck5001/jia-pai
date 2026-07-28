@@ -1,7 +1,9 @@
-import { Barcode, FileUp, History, PackageSearch, RefreshCw, Search, ShoppingBasket } from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
+import { Barcode, FileUp, History, PackageSearch, RefreshCw, Search, Settings, ShoppingBasket } from 'lucide-react';
 import { lazy, Suspense, useEffect, useState } from 'react';
+import { readNasServerUrl, saveNasServerUrl } from './lib/app-config';
 import { formatPrice, isPublishedCatalog, searchProducts } from './lib/catalog';
-import { fetchCatalog } from './lib/server-api';
+import { fetchCatalog, verifyNasServer } from './lib/server-api';
 import type { Catalog, Product } from './types';
 
 const ImportWorkspace = lazy(() => import('./components/ImportWorkspace').then((module) => ({ default: module.ImportWorkspace })));
@@ -60,14 +62,22 @@ function ProductResult({ product, onSelect }: { product: Product; onSelect: () =
 }
 
 export default function App() {
+  const isNativePlatform = Capacitor.isNativePlatform();
   const [view, setView] = useState<'lookup' | 'import' | 'photo-import' | 'manage'>('lookup');
   const [catalogState, setCatalogState] = useState<CatalogState>({ status: 'loading' });
   const [query, setQuery] = useState('');
   const [recents, setRecents] = useState<string[]>(readRecentQueries);
   const [scannerOpen, setScannerOpen] = useState(false);
   const [scannerNotice, setScannerNotice] = useState('');
+  const [nasServerUrl, setNasServerUrl] = useState(() => readNasServerUrl(isNativePlatform, window.localStorage));
+  const [nasServerInput, setNasServerInput] = useState(() => nasServerUrl ?? '');
+  const [nasSettingsOpen, setNasSettingsOpen] = useState(() => isNativePlatform && !nasServerUrl);
+  const [nasConnectionStatus, setNasConnectionStatus] = useState('');
+  const [nasConnectionError, setNasConnectionError] = useState('');
+  const [isCheckingNasConnection, setIsCheckingNasConnection] = useState(false);
 
   useEffect(() => {
+    if (isNativePlatform && !nasServerUrl) return;
     let cancelled = false;
     async function loadCatalog() {
       try {
@@ -82,9 +92,76 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [isNativePlatform, nasServerUrl]);
 
   const catalog = catalogState.status === 'ready' ? catalogState.catalog : null;
+
+  function openNasSettings() {
+    setNasServerInput(nasServerUrl ?? '');
+    setNasConnectionStatus('');
+    setNasConnectionError('');
+    setNasSettingsOpen(true);
+  }
+
+  async function testAndSaveNasServer() {
+    setIsCheckingNasConnection(true);
+    setNasConnectionStatus('');
+    setNasConnectionError('');
+    try {
+      const verifiedUrl = await verifyNasServer(nasServerInput);
+      const savedUrl = saveNasServerUrl(verifiedUrl, isNativePlatform, window.localStorage);
+      setNasServerUrl(savedUrl);
+      setNasServerInput(savedUrl);
+      setCatalogState({ status: 'loading' });
+      setNasConnectionStatus('连接成功，正在读取价格表。');
+      setNasSettingsOpen(false);
+    } catch (error) {
+      setNasConnectionError(error instanceof Error ? error.message : '无法连接 NAS 服务，请稍后重试。');
+    } finally {
+      setIsCheckingNasConnection(false);
+    }
+  }
+
+  if (isNativePlatform && (!nasServerUrl || nasSettingsOpen)) {
+    return (
+      <main className="app-shell nas-config-shell">
+        <header className="app-header">
+          <div className="brand-lockup">
+            <span className="brand-mark">价</span>
+            <div><strong>小卖部查价</strong><span>Android 应用</span></div>
+          </div>
+        </header>
+        <section className="nas-config-panel" aria-labelledby="nas-config-title">
+          <span className="eyebrow">首次连接</span>
+          <h1 id="nas-config-title">连接 NAS</h1>
+          <p>输入小卖部查价服务的内网地址。连接成功后，商品、照片和管理员数据都只会与这台 NAS 通信。</p>
+          <label className="nas-config-field">
+            <span>NAS 服务地址</span>
+            <input
+              autoCapitalize="none"
+              autoComplete="off"
+              autoCorrect="off"
+              disabled={isCheckingNasConnection}
+              inputMode="url"
+              onChange={(event) => setNasServerInput(event.target.value)}
+              placeholder="http://192.168.1.10:3000"
+              value={nasServerInput}
+            />
+          </label>
+          <p className="nas-config-note">支持 HTTP 或 HTTPS。HTTP 仅适用于公司可信内网。</p>
+          {nasConnectionError ? <p className="nas-config-error" role="alert">{nasConnectionError}</p> : null}
+          {nasConnectionStatus ? <p className="success-notice" role="status">{nasConnectionStatus}</p> : null}
+          <div className="nas-config-actions">
+            {nasServerUrl ? <button className="text-button" type="button" onClick={() => setNasSettingsOpen(false)} disabled={isCheckingNasConnection}>取消</button> : null}
+            <button className="primary-button" type="button" onClick={() => void testAndSaveNasServer()} disabled={isCheckingNasConnection}>
+              {isCheckingNasConnection ? <RefreshCw className="spin" size={18} aria-hidden="true" /> : null}
+              {isCheckingNasConnection ? '正在连接' : '测试连接并保存'}
+            </button>
+          </div>
+        </section>
+      </main>
+    );
+  }
 
   if (view === 'import') {
     return <Suspense fallback={<main className="app-shell"><section className="state-panel"><RefreshCw className="spin" size={22} aria-hidden="true" /><p>正在打开导入工具</p></section></main>}><ImportWorkspace baseCatalog={catalog} onBack={() => setView('lookup')} onCatalogPublished={(nextCatalog) => setCatalogState({ status: 'ready', catalog: nextCatalog })} onPhotoImport={() => setView('photo-import')} /></Suspense>;
@@ -125,6 +202,7 @@ export default function App() {
           <div><strong>小卖部查价</strong><span>内部价格查询</span></div>
         </div>
         <div className="header-actions">
+          {isNativePlatform ? <button className="import-button" type="button" onClick={openNasSettings} aria-label="NAS 设置" title="NAS 设置"><Settings size={18} aria-hidden="true" /><span>NAS 设置</span></button> : null}
           <button className="import-button management-button" type="button" onClick={() => setView('manage')} aria-label="商品管理" title="商品管理">
             <PackageSearch size={18} aria-hidden="true" />
             <span>商品管理</span>
@@ -135,6 +213,8 @@ export default function App() {
           </button>
         </div>
       </header>
+
+      {nasConnectionStatus ? <p className="nas-connection-notice success-notice" role="status">{nasConnectionStatus}</p> : null}
 
       <section className="lookup-stage" aria-labelledby="lookup-title">
         <div className="lookup-heading">

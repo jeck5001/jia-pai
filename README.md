@@ -55,6 +55,14 @@ GitHub 仓库与 GHCR 镜像均为公开访问，NAS 不需要 GitHub Token 或 
 
 不要删除 `data/` 目录，否则会丢失管理员后续发布的价格表。
 
+## Android App
+
+每次推送到 GitHub `main` 后，`Build Android APK` 工作流会在 GitHub Runner 中执行前端测试、Capacitor 同步、Android lint 和 debug APK 构建。工作流成功后，在该次 Actions 运行的 Artifacts 下载 `xiaomaibu-android-<提交 SHA>`，解压并安装其中的 `app-debug.apk`。
+
+首次打开 App 会要求连接 NAS：填写小卖部服务的根地址，例如 `http://NAS_IP:3000`，App 会调用 `/api/health` 验证后才保存。地址仅保存在该手机本地；App 不包含 NAS 地址、Sub2API 地址、模型 Key 或管理员口令。可从 App 右上角的“NAS 设置”重新测试或修改。
+
+内网 HTTP 仅适合公司可信网络；通过公网访问时必须使用 HTTPS 和访问控制。当前产物是未进行正式发布签名的 debug APK，不可用于 Play 上架；不同 Actions 构建的 debug 签名可能不同，升级失败时先卸载旧版再安装新版，并重新填写 NAS 地址。
+
 ## 管理与识别
 
 打开右上角“导入价格表”：
