@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -7,6 +7,8 @@ import { createApp } from './app.mjs';
 const temporaryDirectories = [];
 
 afterEach(async () => {
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
   await Promise.all(temporaryDirectories.splice(0).map((directory) => rm(directory, { recursive: true, force: true })));
 });
 
@@ -74,6 +76,31 @@ describe('一体化服务', () => {
       });
       expect(response.status).toBe(503);
       expect((await response.json()).error.message).toContain('SUB2API_API_KEY');
+    } finally {
+      await app.close();
+    }
+  });
+
+  it('记录脱敏网络错误码，并返回可操作的连接失败提示', async () => {
+    const connectionError = Object.assign(new TypeError('fetch failed'), {
+      cause: Object.assign(new Error('connect ECONNREFUSED'), { code: 'ECONNREFUSED' }),
+    });
+    const fetchImpl = vi.fn().mockRejectedValue(connectionError);
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const app = await runningApp({ fetchImpl, sub2ApiBaseUrl: 'http://sub2api.example:8084', sub2ApiKey: 'test-key' });
+    try {
+      const response = await fetch(`${app.baseUrl}/api/vision/recognize`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageUrl: 'data:image/jpeg;base64,AA==' }),
+      });
+      expect(response.status).toBe(502);
+      expect((await response.json()).error.message).toContain('ECONNREFUSED');
+      expect(log).toHaveBeenCalledWith('[vision] Sub2API connection failed', {
+        endpoint: 'http://sub2api.example:8084',
+        errorCode: 'ECONNREFUSED',
+        errorType: 'Error',
+      });
     } finally {
       await app.close();
     }
