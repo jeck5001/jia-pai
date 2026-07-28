@@ -221,7 +221,7 @@ h2 { margin-bottom: 0; font-size: 19px; letter-spacing: 0; }
 .add-product-button { color: #f8fbf9; background: #114338; }
 .add-product-button:hover { background: #0c342b; }
 .dedupe-note { margin: 7px 0 0; color: #795814; font-size: 13px; line-height: 1.5; }
-.manage-table { min-width: 980px; }
+.manage-table { min-width: 880px; }
 .manage-no-results { padding: 26px 8px !important; color: #68736e; text-align: center; }
 .manage-publish-bar { display: flex; align-items: end; justify-content: flex-end; gap: 10px; margin-top: 22px; }
 .manage-empty-state { margin-top: 72px; }
