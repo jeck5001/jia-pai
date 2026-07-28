@@ -25,6 +25,8 @@ export type ImportIssue = {
   severity: 'error' | 'warning';
   message: string;
   row?: number;
+  rows?: number[];
+  productIds?: string[];
 };
 
 export type ImportResult = {

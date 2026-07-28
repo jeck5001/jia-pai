@@ -66,26 +66,30 @@ export function validateProducts(products: Product[]): ImportIssue[] {
   products.forEach((product, index) => {
     const row = product.sourceRow ?? index + 1;
     if (!product.name.trim()) {
-      issues.push({ severity: 'error', row, message: '商品名称不能为空' });
+      issues.push({ severity: 'error', row, rows: [row], productIds: [product.id], message: '商品名称不能为空' });
     }
     if (!Number.isInteger(product.priceCents) || product.priceCents < 0) {
-      issues.push({ severity: 'error', row, message: '零售价必须是大于或等于 0 的金额' });
+      issues.push({ severity: 'error', row, rows: [row], productIds: [product.id], message: '零售价必须是大于或等于 0 的金额' });
     }
 
     const normalizedItemId = normalizeText(product.itemId);
     const existingByItemId = normalizedItemId ? seenItemIds.get(normalizedItemId) : undefined;
     if (existingByItemId && existingByItemId.priceCents !== product.priceCents) {
+      const existingRow = existingByItemId.sourceRow ?? products.indexOf(existingByItemId) + 1;
       issues.push({
         severity: 'error',
         row,
-        message: `与第 ${existingByItemId.sourceRow ?? products.indexOf(existingByItemId) + 1} 行是同一商品，但价格不同`,
+        rows: [existingRow, row],
+        productIds: [existingByItemId.id, product.id],
+        message: `与第 ${existingRow} 行「${existingByItemId.name}」的 Item ID 相同，但价格不同：${formatPrice(existingByItemId.priceCents)} 和 ${formatPrice(product.priceCents)}`,
       });
     } else if (existingByItemId) {
-      issues.push({ severity: 'warning', row, message: '与前一条商品重复，将只保留一条' });
+      issues.push({ severity: 'warning', row, rows: [existingByItemId.sourceRow ?? products.indexOf(existingByItemId) + 1, row], productIds: [existingByItemId.id, product.id], message: '与前一条商品重复，将只保留一条' });
     } else {
       const namePriceKey = `${normalizeText(product.name)}:${product.priceCents}`;
       if (seenNamePrices.has(namePriceKey)) {
-        issues.push({ severity: 'warning', row, message: '与前一条同名同价商品重复，将只保留一条' });
+        const existingByName = seenNamePrices.get(namePriceKey)!;
+        issues.push({ severity: 'warning', row, rows: [existingByName.sourceRow ?? products.indexOf(existingByName) + 1, row], productIds: [existingByName.id, product.id], message: '与前一条同名同价商品重复，将只保留一条' });
       } else {
         seenNamePrices.set(namePriceKey, product);
       }

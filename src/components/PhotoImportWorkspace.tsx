@@ -58,11 +58,21 @@ export function PhotoImportWorkspace({ baseCatalog, onBack, onCatalogPublished, 
   const draftIssues = draft.length ? validateProducts(draft) : [];
   const allIssues = [...issues, ...draftIssues];
   const hasErrors = allIssues.some((issue) => issue.severity === 'error');
+  const errorRows = new Set(draftIssues.filter((issue) => issue.severity === 'error').flatMap((issue) => issue.rows ?? (issue.row ? [issue.row] : [])));
   const baseProducts = baseCatalog?.products ?? [];
   const existingCount = uniqueProducts(baseProducts).length;
   const mergedCount = uniqueProducts([...baseProducts, ...draft]).length;
   const addedCount = Math.max(0, mergedCount - existingCount);
   const previewProducts = searchProducts(draft, previewQuery);
+
+  function focusIssue(issue: ImportIssue) {
+    const row = issue.rows?.[issue.rows.length - 1] ?? issue.row;
+    const index = draft.findIndex((product, productIndex) => (product.sourceRow ?? productIndex + 1) === row);
+    const target = index >= 0 ? document.getElementById(`candidate-${index}`) : null;
+    target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    target?.querySelector<HTMLInputElement>('input')?.focus({ preventScroll: true });
+  }
+
   async function handleImageChange(event: ChangeEvent<HTMLInputElement>) {
     const files = Array.from(event.target.files ?? []);
     event.target.value = '';
@@ -228,6 +238,7 @@ export function PhotoImportWorkspace({ baseCatalog, onBack, onCatalogPublished, 
           {allIssues.map((issue, index) => (
             <p key={issueKey(issue, index)} className={issue.severity === 'error' ? 'issue-error' : 'issue-warning'}>
               {issue.row ? `第 ${issue.row} 行：` : ''}{issue.message}
+              {issue.row || issue.rows?.length ? <button className="issue-jump" type="button" onClick={() => focusIssue(issue)}>{(issue.rows?.length ?? issue.productIds?.length ?? 0) > 1 ? '查看冲突行' : '定位此行'}</button> : null}
             </p>
           ))}
         </section>
@@ -261,6 +272,7 @@ export function PhotoImportWorkspace({ baseCatalog, onBack, onCatalogPublished, 
             <table className="draft-table photo-draft-table">
               <thead>
                 <tr>
+                  <th>候选行</th>
                   <th>商品</th>
                   <th>Item ID</th>
                   <th>表中数量</th>
@@ -271,7 +283,8 @@ export function PhotoImportWorkspace({ baseCatalog, onBack, onCatalogPublished, 
               </thead>
               <tbody>
                 {draft.map((product, index) => (
-                  <tr key={`${product.id}-${index}`}>
+                  <tr id={`candidate-${index}`} key={`${product.id}-${index}`} className={errorRows.has(product.sourceRow ?? index + 1) ? 'draft-row-error' : ''}>
+                    <td className="draft-row-number">第 {product.sourceRow ?? index + 1} 行</td>
                     <td><input aria-label={`第 ${index + 1} 条商品名称`} value={product.name} onChange={(event) => updateProduct(index, { name: event.target.value })} /></td>
                     <td><input aria-label={`第 ${index + 1} 条 Item ID`} value={product.itemId ?? ''} onChange={(event) => updateProduct(index, { itemId: event.target.value || undefined })} /></td>
                     <td><input aria-label={`第 ${index + 1} 条表中数量`} inputMode="numeric" value={product.stockQuantity ?? ''} onChange={(event) => {
