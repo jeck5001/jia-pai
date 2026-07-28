@@ -33,6 +33,7 @@ button:disabled { cursor: not-allowed; opacity: .48; }
   gap: 16px;
   min-height: 44px;
 }
+.header-actions { display: flex; align-items: center; gap: 3px; }
 
 .brand-lockup { display: flex; align-items: center; gap: 11px; }
 .brand-lockup > div { display: grid; gap: 2px; }
@@ -199,6 +200,30 @@ h2 { margin-bottom: 0; font-size: 19px; letter-spacing: 0; }
 .preview-results p span { color: #b34234; font-weight: 750; }
 .success-notice { margin-top: 22px; }
 
+.manage-controls { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(180px, 1fr) minmax(210px, 1.2fr); gap: 12px; align-items: end; padding: 22px 0; border-bottom: 1px solid #d9e1dc; }
+.manage-controls > label { display: grid; gap: 7px; color: #55615c; font-size: 13px; font-weight: 700; }
+.manage-controls input { width: 100%; min-height: 41px; padding: 8px 10px; color: #17201e; background: #fff; border: 1px solid #ccd6d0; border-radius: 5px; outline: none; }
+.manage-controls input:focus { border-color: #114338; box-shadow: 0 0 0 3px #d7e7df; }
+.manage-controls p { margin: 0; color: #68736e; font-size: 13px; line-height: 1.55; }
+.manage-toolbar { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: center; padding-top: 20px; }
+.manage-search { display: flex; align-items: center; min-width: 0; min-height: 42px; gap: 8px; padding: 0 10px; color: #68736e; background: #fff; border: 1px solid #ccd6d0; border-radius: 5px; }
+.manage-search:focus-within { border-color: #114338; box-shadow: 0 0 0 3px #d7e7df; }
+.manage-search input { width: 100%; min-width: 0; color: #17201e; background: transparent; border: 0; outline: none; }
+.manage-filter { display: inline-grid; grid-template-columns: repeat(3, auto); min-height: 40px; overflow: hidden; border: 1px solid #cbd6d0; border-radius: 6px; }
+.manage-filter button { padding: 0 12px; color: #52605a; background: #fff; border: 0; font-size: 13px; font-weight: 750; }
+.manage-filter button + button { border-left: 1px solid #cbd6d0; }
+.manage-filter button:hover { background: #e7eeea; }
+.manage-filter button.active { color: #f8fbf9; background: #114338; }
+.manage-draft-toolbar { margin-top: 24px; }
+.manage-actions { display: flex; align-items: center; flex-wrap: wrap; justify-content: end; gap: 8px; }
+.add-product-button { color: #f8fbf9; background: #114338; }
+.add-product-button:hover { background: #0c342b; }
+.dedupe-note { margin: 7px 0 0; color: #795814; font-size: 13px; line-height: 1.5; }
+.manage-table { min-width: 980px; }
+.manage-no-results { padding: 26px 8px !important; color: #68736e; text-align: center; }
+.manage-publish-bar { display: flex; align-items: end; justify-content: flex-end; gap: 10px; margin-top: 22px; }
+.manage-empty-state { margin-top: 72px; }
+
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
 @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
@@ -210,6 +235,7 @@ h2 { margin-bottom: 0; font-size: 19px; letter-spacing: 0; }
   .brand-lockup > div span { display: none; }
   .import-button { width: 40px; padding: 0; }
   .import-button span { display: none; }
+  .header-actions { gap: 1px; }
   .lookup-stage { padding-top: 72px; }
   h1 { font-size: 34px; }
   .search-row { gap: 8px; margin-top: 26px; }
@@ -224,6 +250,14 @@ h2 { margin-bottom: 0; font-size: 19px; letter-spacing: 0; }
   .import-mode-switch { display: grid; width: 100%; }
   .import-mode-switch button { min-width: 0; }
   .import-controls { grid-template-columns: 1fr; }
+  .manage-controls { grid-template-columns: 1fr; }
+  .manage-toolbar { grid-template-columns: 1fr; }
+  .manage-filter { width: 100%; }
+  .manage-filter button { min-width: 0; }
+  .manage-actions { width: 100%; justify-content: stretch; }
+  .manage-actions .text-button { flex: 1 1 auto; }
+  .manage-publish-bar { align-items: stretch; flex-direction: column; }
+  .manage-publish-bar .primary-button { width: 100%; }
   .file-picker { justify-content: center; }
   .photo-controls .photo-picker { width: 100%; }
   .file-summary > span:nth-of-type(2) { width: 100%; margin-left: 27px; }
