@@ -64,6 +64,8 @@ export function ProductManagementWorkspace({ baseCatalog, onBack, onCatalogPubli
       const matchesVisibility = visibility === 'all' || (visibility === 'active' ? product.active : !product.active);
       return matchesVisibility && (!normalizedQuery || productSearchText(product).includes(normalizedQuery));
     });
+  const hasSpecifications = draft.some((product) => Boolean(product.specification?.trim()));
+  const hasBarcodesOrAliases = draft.some((product) => [...(product.barcodes ?? []), ...(product.aliases ?? [])].some((value) => value.trim()));
   const activeCount = draft.filter((product) => product.active).length;
   const deduplicatedCount = uniqueProducts(draft).length;
 
@@ -206,7 +208,7 @@ export function ProductManagementWorkspace({ baseCatalog, onBack, onCatalogPubli
                   <textarea aria-label={`商品名称：${product.name || '新商品'}`} rows={productNameRows(product.name)} value={product.name} onChange={(event) => updateProduct(index, { name: event.target.value })} />
                 </label>
                 <div className="manage-mobile-field-grid">
-                  <label className="manage-mobile-field"><span>规格</span><input aria-label={`商品规格：${product.name || '新商品'}`} value={product.specification ?? ''} onChange={(event) => updateProduct(index, { specification: event.target.value || undefined })} /></label>
+                  {hasSpecifications ? <label className="manage-mobile-field"><span>规格</span><input aria-label={`商品规格：${product.name || '新商品'}`} value={product.specification ?? ''} onChange={(event) => updateProduct(index, { specification: event.target.value || undefined })} /></label> : null}
                   <label className="manage-mobile-field"><span>Item ID</span><input aria-label={`商品 Item ID：${product.name || '新商品'}`} value={product.itemId ?? ''} onChange={(event) => updateProduct(index, { itemId: event.target.value || undefined })} /></label>
                   <label className="manage-mobile-field"><span>零售价</span><input aria-label={`商品零售价：${product.name || '新商品'}`} inputMode="decimal" value={product.priceCents >= 0 ? priceForInput(product.priceCents) : ''} onChange={(event) => updateProduct(index, { priceCents: parsePriceToCents(event.target.value) ?? -1 })} /></label>
                   <label className="manage-mobile-field"><span>库存</span><input aria-label={`商品库存：${product.name || '新商品'}`} inputMode="numeric" value={product.stockQuantity ?? ''} onChange={(event) => {
@@ -215,7 +217,7 @@ export function ProductManagementWorkspace({ baseCatalog, onBack, onCatalogPubli
                     updateProduct(index, { stockQuantity: value && Number.isFinite(quantity) && quantity >= 0 ? quantity : undefined });
                   }} /></label>
                 </div>
-                <label className="manage-mobile-field manage-mobile-field-wide"><span>条码 / 别名</span><input aria-label={`商品条码和别名：${product.name || '新商品'}`} value={[...(product.barcodes ?? []), ...(product.aliases ?? [])].join(', ')} onChange={(event) => updateProduct(index, { barcodes: event.target.value.split(/[，,;；]/).map((value) => value.trim()).filter(Boolean), aliases: [] })} /></label>
+                {hasBarcodesOrAliases ? <label className="manage-mobile-field manage-mobile-field-wide"><span>条码 / 别名</span><input aria-label={`商品条码和别名：${product.name || '新商品'}`} value={[...(product.barcodes ?? []), ...(product.aliases ?? [])].join(', ')} onChange={(event) => updateProduct(index, { barcodes: event.target.value.split(/[，,;；]/).map((value) => value.trim()).filter(Boolean), aliases: [] })} /></label> : null}
               </article>
             ))}
             {!visibleProducts.length ? <p className="manage-no-results">{draft.length ? '没有符合当前筛选条件的商品。' : '还没有商品，点击“新增商品”开始录入。'}</p> : null}
@@ -226,11 +228,11 @@ export function ProductManagementWorkspace({ baseCatalog, onBack, onCatalogPubli
               <thead>
                 <tr>
                   <th>商品</th>
-                  <th>规格</th>
+                  {hasSpecifications ? <th>规格</th> : null}
                   <th>Item ID</th>
                   <th>零售价</th>
                   <th>库存</th>
-                  <th>条码 / 别名</th>
+                  {hasBarcodesOrAliases ? <th>条码 / 别名</th> : null}
                   <th>状态</th>
                   <th><span className="sr-only">删除</span></th>
                 </tr>
@@ -239,7 +241,7 @@ export function ProductManagementWorkspace({ baseCatalog, onBack, onCatalogPubli
                 {visibleProducts.map(({ product, index }) => (
                   <tr key={product.id} className={errorProductIds.has(product.id) ? 'draft-row-error' : undefined}>
                     <td><textarea className="product-name-input" aria-label={`商品名称：${product.name || '新商品'}`} rows={productNameRows(product.name)} value={product.name} onChange={(event) => updateProduct(index, { name: event.target.value })} /></td>
-                    <td><input aria-label={`商品规格：${product.name || '新商品'}`} value={product.specification ?? ''} onChange={(event) => updateProduct(index, { specification: event.target.value || undefined })} /></td>
+                    {hasSpecifications ? <td><input aria-label={`商品规格：${product.name || '新商品'}`} value={product.specification ?? ''} onChange={(event) => updateProduct(index, { specification: event.target.value || undefined })} /></td> : null}
                     <td><input aria-label={`商品 Item ID：${product.name || '新商品'}`} value={product.itemId ?? ''} onChange={(event) => updateProduct(index, { itemId: event.target.value || undefined })} /></td>
                     <td><input aria-label={`商品零售价：${product.name || '新商品'}`} inputMode="decimal" value={product.priceCents >= 0 ? priceForInput(product.priceCents) : ''} onChange={(event) => updateProduct(index, { priceCents: parsePriceToCents(event.target.value) ?? -1 })} /></td>
                     <td><input aria-label={`商品库存：${product.name || '新商品'}`} inputMode="numeric" value={product.stockQuantity ?? ''} onChange={(event) => {
@@ -247,12 +249,12 @@ export function ProductManagementWorkspace({ baseCatalog, onBack, onCatalogPubli
                       const quantity = Number(value);
                       updateProduct(index, { stockQuantity: value && Number.isFinite(quantity) && quantity >= 0 ? quantity : undefined });
                     }} /></td>
-                    <td><input aria-label={`商品条码和别名：${product.name || '新商品'}`} value={[...(product.barcodes ?? []), ...(product.aliases ?? [])].join(', ')} onChange={(event) => updateProduct(index, { barcodes: event.target.value.split(/[，,;；]/).map((value) => value.trim()).filter(Boolean), aliases: [] })} /></td>
+                    {hasBarcodesOrAliases ? <td><input aria-label={`商品条码和别名：${product.name || '新商品'}`} value={[...(product.barcodes ?? []), ...(product.aliases ?? [])].join(', ')} onChange={(event) => updateProduct(index, { barcodes: event.target.value.split(/[，,;；]/).map((value) => value.trim()).filter(Boolean), aliases: [] })} /></td> : null}
                     <td><label className="switch-label"><input type="checkbox" checked={product.active} onChange={(event) => updateProduct(index, { active: event.target.checked })} /><span>{product.active ? '上架' : '下架'}</span></label></td>
                     <td><button className="icon-button danger" type="button" onClick={() => removeProduct(index)} aria-label={`删除商品：${product.name || '新商品'}`} title="删除商品"><X size={17} /></button></td>
                   </tr>
                 ))}
-                {!visibleProducts.length ? <tr><td className="manage-no-results" colSpan={8}>{draft.length ? '没有符合当前筛选条件的商品。' : '还没有商品，点击“新增商品”开始录入。'}</td></tr> : null}
+                {!visibleProducts.length ? <tr><td className="manage-no-results" colSpan={6 + Number(hasSpecifications) + Number(hasBarcodesOrAliases)}>{draft.length ? '没有符合当前筛选条件的商品。' : '还没有商品，点击“新增商品”开始录入。'}</td></tr> : null}
               </tbody>
             </table>
           </div>
