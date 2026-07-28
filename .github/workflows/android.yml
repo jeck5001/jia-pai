@@ -1,0 +1,79 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install required Android platform
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Test web application
+        run: npm run test
+
+      - name: Build web application
+        run: npm run build
+
+      - name: Sync Capacitor Android project
+        run: npm run android:sync
+
+      - name: Build and lint debug APK
+        working-directory: android
+        run: ./gradlew assembleDebug lintDebug
+
+      - name: Prove APK verifier rejects a missing APK
+        run: |
+          apk=android/app/build/outputs/apk/debug/app-debug.apk
+          mv "$apk" "$apk.pending"
+          if npm run verify:android-package -- "$apk"; then
+            mv "$apk.pending" "$apk"
+            echo "APK verifier accepted a missing APK" >&2
+            exit 1
+          fi
+          mv "$apk.pending" "$apk"
+
+      - name: Verify APK identity and permissions
+        run: npm run verify:android-package -- android/app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Upload Android APK and lint report
+        uses: actions/upload-artifact@v4
+        with:
+          name: xiaomaibu-android-${{ github.sha }}
+          if-no-files-found: error
+          retention-days: 30
+          path: |
+            android/app/build/outputs/apk/debug/app-debug.apk
+            android/app/build/reports/lint-results-debug.html

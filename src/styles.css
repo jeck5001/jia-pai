@@ -229,6 +229,18 @@ h2 { margin-bottom: 0; font-size: 19px; letter-spacing: 0; }
 .manage-publish-bar { display: flex; align-items: end; justify-content: flex-end; gap: 10px; margin-top: 22px; }
 .manage-empty-state { margin-top: 72px; }
 
+.nas-config-shell { display: grid; grid-template-rows: auto 1fr; }
+.nas-config-panel { width: min(100%, 540px); align-self: center; margin: 0 auto; padding: 30px 0 60px; animation: rise .45s ease both; }
+.nas-config-panel h1 { margin: 8px 0 11px; }
+.nas-config-panel > p { color: #617069; font-size: 15px; line-height: 1.65; }
+.nas-config-field { display: grid; gap: 8px; margin-top: 29px; color: #53615b; font-size: 13px; font-weight: 750; }
+.nas-config-field input { width: 100%; min-height: 51px; padding: 10px 13px; color: #17201e; background: #fff; border: 1px solid #cbd6d0; border-radius: 6px; outline: none; font-size: 16px; }
+.nas-config-field input:focus { border-color: #114338; box-shadow: 0 0 0 3px #d7e7df; }
+.nas-config-note { margin: 10px 0 0 !important; color: #75817b !important; font-size: 13px !important; }
+.nas-config-error { margin: 16px 0 0 !important; padding: 11px 13px; color: #9b3d32 !important; background: #faece9; border-left: 3px solid #b34234; font-size: 14px !important; }
+.nas-config-actions { display: flex; align-items: center; justify-content: end; gap: 8px; margin-top: 23px; }
+.nas-connection-notice { margin-top: 20px; }
+
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
 @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
@@ -265,6 +277,9 @@ h2 { margin-bottom: 0; font-size: 19px; letter-spacing: 0; }
   .manage-actions .text-button { flex: 1 1 auto; }
   .manage-publish-bar { align-items: stretch; flex-direction: column; }
   .manage-publish-bar .primary-button { width: 100%; }
+  .nas-config-panel { align-self: start; padding-top: clamp(64px, 16vh, 132px); }
+  .nas-config-actions { align-items: stretch; flex-direction: column-reverse; }
+  .nas-config-actions .primary-button, .nas-config-actions .text-button { width: 100%; }
   .file-picker { justify-content: center; }
   .photo-controls .photo-picker { width: 100%; }
   .file-summary > span:nth-of-type(2) { width: 100%; margin-left: 27px; }
