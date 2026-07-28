@@ -125,11 +125,11 @@ export default function App() {
           <div><strong>小卖部查价</strong><span>内部价格查询</span></div>
         </div>
         <div className="header-actions">
-          <button className="import-button" type="button" onClick={() => setView('manage')} aria-label="商品管理">
+          <button className="import-button management-button" type="button" onClick={() => setView('manage')} aria-label="商品管理" title="商品管理">
             <PackageSearch size={18} aria-hidden="true" />
             <span>商品管理</span>
           </button>
-          <button className="import-button" type="button" onClick={() => setView('import')} aria-label="导入价格表">
+          <button className="import-button" type="button" onClick={() => setView('import')} aria-label="导入价格表" title="导入价格表">
             <FileUp size={18} aria-hidden="true" />
             <span>导入价格表</span>
           </button>
