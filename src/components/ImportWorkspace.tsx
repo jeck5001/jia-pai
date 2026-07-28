@@ -1,4 +1,4 @@
-import { Camera, Download, FileSpreadsheet, RefreshCw, RotateCcw, Search, Upload, X } from 'lucide-react';
+import { AlertCircle, AlertTriangle, Camera, CheckCircle2, Download, FileSpreadsheet, RefreshCw, RotateCcw, Search, Upload, X } from 'lucide-react';
 import { ChangeEvent, useState } from 'react';
 import { formatPrice, parsePriceToCents, priceForInput, searchProducts, validateProducts } from '../lib/catalog';
 import { createPublishedCatalog, importRows, readSpreadsheet } from '../lib/importer';
@@ -141,15 +141,15 @@ export function ImportWorkspace({ baseCatalog, onBack, onCatalogPublished, onPho
       </section>
 
       <section className="import-controls" aria-label="价格表导入设置">
-        <label>
+        <label className="field">
           <span>价格表来源</span>
           <input value={sourceLabel} onChange={(event) => setSourceLabel(event.target.value)} maxLength={80} />
         </label>
-        <label>
+        <label className="field">
           <span>生效时间</span>
           <input type="datetime-local" value={effectiveAt} onChange={(event) => setEffectiveAt(event.target.value)} />
         </label>
-        <label>
+        <label className="field">
           <span>管理员口令</span>
           <input type="password" value={adminToken} onChange={(event) => setAdminToken(event.target.value)} placeholder="未设置可留空" autoComplete="off" disabled={isPublishing} />
         </label>
@@ -176,7 +176,8 @@ export function ImportWorkspace({ baseCatalog, onBack, onCatalogPublished, onPho
         <section className="issue-list" aria-live="polite">
           {allIssues.map((issue, index) => (
             <p key={issueKey(issue, index)} className={issue.severity === 'error' ? 'issue-error' : 'issue-warning'}>
-              {issue.row ? `第 ${issue.row} 行：` : ''}{issue.message}
+              {issue.severity === 'error' ? <AlertCircle size={17} aria-hidden="true" /> : <AlertTriangle size={17} aria-hidden="true" />}
+              <span>{issue.row ? `第 ${issue.row} 行：` : ''}{issue.message}</span>
             </p>
           ))}
         </section>
@@ -200,8 +201,46 @@ export function ImportWorkspace({ baseCatalog, onBack, onCatalogPublished, onPho
               </button>
             </div>
           </section>
-          {publishError ? <p className="publish-notice publish-notice-error" role="alert">{publishError}</p> : null}
-          {status ? <p className="publish-notice" role="status">{status}</p> : null}
+          {publishError ? (
+            <p className="notice notice-error publish-notice" role="alert">
+              <AlertCircle size={18} aria-hidden="true" />
+              <span>{publishError}</span>
+            </p>
+          ) : null}
+          {status ? (
+            <p className="notice notice-success publish-notice" role="status">
+              <CheckCircle2 size={18} aria-hidden="true" />
+              <span>{status}</span>
+            </p>
+          ) : null}
+
+          <div className="draft-cards">
+            {draft.map((product, index) => (
+              <article key={`${product.id}-${index}`} className="draft-card">
+                <div className="draft-card-heading">
+                  <span>第 {index + 1} 条</span>
+                  <div>
+                    <label className="switch-label"><input type="checkbox" checked={product.active} onChange={(event) => updateProduct(index, { active: event.target.checked })} /><span>{product.active ? '上架' : '下架'}</span></label>
+                    <button className="icon-button danger" type="button" onClick={() => removeProduct(index)} aria-label={`删除第 ${index + 1} 条商品`} title="删除商品"><X size={18} /></button>
+                  </div>
+                </div>
+                <label className="draft-field">
+                  <span>商品名称</span>
+                  <input aria-label={`第 ${index + 1} 条商品名称`} value={product.name} onChange={(event) => updateProduct(index, { name: event.target.value })} />
+                </label>
+                <div className="draft-field-grid">
+                  <label className="draft-field"><span>规格</span><input aria-label={`第 ${index + 1} 条规格`} value={product.specification ?? ''} onChange={(event) => updateProduct(index, { specification: event.target.value || undefined })} /></label>
+                  <label className="draft-field"><span>Item ID</span><input aria-label={`第 ${index + 1} 条 Item ID`} value={product.itemId ?? ''} onChange={(event) => updateProduct(index, { itemId: event.target.value || undefined })} /></label>
+                  <label className="draft-field"><span>零售价</span><input aria-label={`第 ${index + 1} 条零售价`} inputMode="decimal" value={product.priceCents >= 0 ? priceForInput(product.priceCents) : ''} onChange={(event) => updateProduct(index, { priceCents: parsePriceToCents(event.target.value) ?? -1 })} /></label>
+                </div>
+                <label className="draft-field">
+                  <span>条码 / 别名</span>
+                  <input aria-label={`第 ${index + 1} 条条码和别名`} value={[...(product.barcodes ?? []), ...(product.aliases ?? [])].join(', ')} onChange={(event) => updateProduct(index, { barcodes: event.target.value.split(/[，,;；]/).map((value) => value.trim()).filter(Boolean), aliases: [] })} />
+                </label>
+              </article>
+            ))}
+          </div>
+
           <div className="table-scroll">
             <table className="draft-table">
               <thead>

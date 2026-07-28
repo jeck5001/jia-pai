@@ -1,4 +1,4 @@
-import { Camera, Download, ImagePlus, Plus, RefreshCw, RotateCcw, Search, Upload, X } from 'lucide-react';
+import { AlertCircle, AlertTriangle, Camera, CheckCircle2, Download, ImagePlus, Plus, RefreshCw, RotateCcw, Search, Upload, X } from 'lucide-react';
 import { ChangeEvent, useEffect, useState } from 'react';
 import { formatPrice, parsePriceToCents, priceForInput, searchProducts, stripDraftMetadata, uniqueProducts, validateProducts } from '../lib/catalog';
 import { publishCatalog } from '../lib/server-api';
@@ -69,9 +69,13 @@ export function PhotoImportWorkspace({ baseCatalog, onBack, onCatalogPublished, 
   function focusIssue(issue: ImportIssue) {
     const row = issue.rows?.[issue.rows.length - 1] ?? issue.row;
     const index = draft.findIndex((product, productIndex) => (product.sourceRow ?? productIndex + 1) === row);
-    const target = index >= 0 ? document.getElementById(`candidate-${index}`) : null;
-    target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    target?.querySelector<HTMLInputElement>('input')?.focus({ preventScroll: true });
+    if (index < 0) return;
+    const candidates = Array.from(document.querySelectorAll<HTMLElement>(`[data-candidate-row="${index}"]`));
+    const target = candidates.find((element) => element.offsetParent !== null) ?? candidates[0];
+    if (!target) return;
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    target.scrollIntoView({ behavior: reducedMotion ? 'auto' : 'smooth', block: 'center' });
+    target.querySelector<HTMLInputElement>('input')?.focus({ preventScroll: true });
   }
 
   async function handleImageChange(event: ChangeEvent<HTMLInputElement>) {
@@ -245,7 +249,8 @@ export function PhotoImportWorkspace({ baseCatalog, onBack, onCatalogPublished, 
         <section className="issue-list" aria-live="polite">
           {allIssues.map((issue, index) => (
             <p key={issueKey(issue, index)} className={issue.severity === 'error' ? 'issue-error' : 'issue-warning'}>
-              {issue.row ? `第 ${issue.row} 行：` : ''}{issue.message}
+              {issue.severity === 'error' ? <AlertCircle size={17} aria-hidden="true" /> : <AlertTriangle size={17} aria-hidden="true" />}
+              <span>{issue.row ? `第 ${issue.row} 行：` : ''}{issue.message}</span>
               {issue.row || issue.rows?.length ? <button className="issue-jump" type="button" onClick={() => focusIssue(issue)}>{(issue.rows?.length ?? issue.productIds?.length ?? 0) > 1 ? '查看冲突行' : '定位此行'}</button> : null}
             </p>
           ))}
@@ -276,8 +281,45 @@ export function PhotoImportWorkspace({ baseCatalog, onBack, onCatalogPublished, 
               </button>
             </div>
           </section>
-          {publishError ? <p className="publish-notice publish-notice-error" role="alert">{publishError}</p> : null}
-          {status ? <p className="publish-notice" role="status">{status}</p> : null}
+          {publishError ? (
+            <p className="notice notice-error publish-notice" role="alert">
+              <AlertCircle size={18} aria-hidden="true" />
+              <span>{publishError}</span>
+            </p>
+          ) : null}
+          {status ? (
+            <p className="notice notice-success publish-notice" role="status">
+              <CheckCircle2 size={18} aria-hidden="true" />
+              <span>{status}</span>
+            </p>
+          ) : null}
+
+          <div className="draft-cards">
+            {draft.map((product, index) => (
+              <article data-candidate-row={index} key={`${product.id}-${index}`} className={errorRows.has(product.sourceRow ?? index + 1) ? 'draft-card draft-row-error' : 'draft-card'}>
+                <div className="draft-card-heading">
+                  <span>第 {product.sourceRow ?? index + 1} 行</span>
+                  <div>
+                    <label className="switch-label"><input type="checkbox" checked={product.active} onChange={(event) => updateProduct(index, { active: event.target.checked })} /><span>{product.active ? '上架' : '下架'}</span></label>
+                    <button className="icon-button danger" type="button" onClick={() => removeProduct(index)} aria-label={`删除第 ${index + 1} 条商品`} title="删除商品"><X size={18} /></button>
+                  </div>
+                </div>
+                <label className="draft-field">
+                  <span>商品名称</span>
+                  <input aria-label={`第 ${index + 1} 条商品名称`} value={product.name} onChange={(event) => updateProduct(index, { name: event.target.value })} />
+                </label>
+                <div className="draft-field-grid">
+                  <label className="draft-field"><span>Item ID</span><input aria-label={`第 ${index + 1} 条 Item ID`} value={product.itemId ?? ''} onChange={(event) => updateProduct(index, { itemId: event.target.value || undefined })} /></label>
+                  <label className="draft-field"><span>表中数量</span><input aria-label={`第 ${index + 1} 条表中数量`} inputMode="numeric" value={product.stockQuantity ?? ''} onChange={(event) => {
+                    const value = event.target.value.trim();
+                    updateProduct(index, { stockQuantity: value && Number.isFinite(Number(value)) ? Number(value) : undefined });
+                  }} /></label>
+                  <label className="draft-field"><span>零售价</span><input aria-label={`第 ${index + 1} 条零售价`} inputMode="decimal" value={product.priceCents >= 0 ? priceForInput(product.priceCents) : ''} onChange={(event) => updateProduct(index, { priceCents: parsePriceToCents(event.target.value) ?? -1 })} /></label>
+                </div>
+              </article>
+            ))}
+          </div>
+
           <div className="table-scroll">
             <table className="draft-table photo-draft-table">
               <thead>
@@ -293,7 +335,7 @@ export function PhotoImportWorkspace({ baseCatalog, onBack, onCatalogPublished, 
               </thead>
               <tbody>
                 {draft.map((product, index) => (
-                  <tr id={`candidate-${index}`} key={`${product.id}-${index}`} className={errorRows.has(product.sourceRow ?? index + 1) ? 'draft-row-error' : ''}>
+                  <tr data-candidate-row={index} key={`${product.id}-${index}`} className={errorRows.has(product.sourceRow ?? index + 1) ? 'draft-row-error' : ''}>
                     <td className="draft-row-number">第 {product.sourceRow ?? index + 1} 行</td>
                     <td><input aria-label={`第 ${index + 1} 条商品名称`} value={product.name} onChange={(event) => updateProduct(index, { name: event.target.value })} /></td>
                     <td><input aria-label={`第 ${index + 1} 条 Item ID`} value={product.itemId ?? ''} onChange={(event) => updateProduct(index, { itemId: event.target.value || undefined })} /></td>
