@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatPrice, parsePriceToCents, searchProducts, uniqueProducts } from './catalog';
+import { formatPrice, parsePriceToCents, searchProducts, uniqueProducts, validateProducts } from './catalog';
 import type { Product } from '../types';
 
 const products: Product[] = [
@@ -78,5 +78,20 @@ describe('价格和查询', () => {
     ]);
 
     expect(result.map((product) => product.id)).toEqual(['item-first', 'name-first', 'different-price']);
+  });
+
+  it('为同 Item ID 的不同价格标记冲突双方，供界面定位', () => {
+    const issues = validateProducts([
+      { id: 'row-28', itemId: '980000101', name: '冲突商品', priceCents: 6300, active: true, sourceRow: 28 },
+      { id: 'row-29', itemId: '980000101', name: '冲突商品', priceCents: 10000, active: true, sourceRow: 29 },
+    ]);
+
+    expect(issues).toContainEqual(expect.objectContaining({
+      severity: 'error',
+      row: 29,
+      rows: [28, 29],
+      productIds: ['row-28', 'row-29'],
+      message: expect.stringContaining('价格不同：¥63 和 ¥100'),
+    }));
   });
 });

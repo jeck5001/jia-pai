@@ -166,9 +166,10 @@ h2 { margin-bottom: 0; font-size: 19px; letter-spacing: 0; }
 .file-summary > span:nth-of-type(2) { margin-left: auto; color: #7b8581; }
 .text-button { min-height: 32px; padding: 0 8px; font-size: 13px; }
 .issue-list { margin: 15px 0; border-left: 3px solid #d8a43c; }
-.issue-list p { margin: 0; padding: 7px 12px; background: #fff8e6; font-size: 14px; line-height: 1.5; }
+.issue-list p { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin: 0; padding: 7px 12px; background: #fff8e6; font-size: 14px; line-height: 1.5; }
 .issue-list .issue-error { color: #9b3d32; background: #faece9; }
 .issue-list .issue-warning { color: #795814; }
+.issue-jump { flex: 0 0 auto; margin-left: auto; color: inherit; font-size: 13px; font-weight: 750; text-decoration: underline; }
 .draft-toolbar { display: flex; align-items: end; justify-content: space-between; gap: 18px; margin-top: 30px; }
 .draft-toolbar h2, .preview-panel h2 { margin-top: 5px; }
 .photo-actions { display: flex; align-items: center; flex-wrap: wrap; justify-content: end; gap: 8px; }
@@ -183,6 +184,9 @@ h2 { margin-bottom: 0; font-size: 19px; letter-spacing: 0; }
 .draft-table { width: 100%; min-width: 810px; border-collapse: collapse; font-size: 13px; }
 .draft-table th { padding: 10px 8px; color: #65716b; font-size: 12px; font-weight: 800; text-align: left; white-space: nowrap; }
 .draft-table td { padding: 7px 8px; border-top: 1px solid #e1e7e3; vertical-align: middle; }
+.draft-row-number { color: #65716b; font-size: 12px; font-weight: 750; white-space: nowrap; }
+.draft-row-error td { background: #fff2ef; }
+.draft-row-error td:first-child { box-shadow: inset 3px 0 #b34234; color: #9b3d32; }
 .draft-table input:not([type="checkbox"]) { width: 100%; min-width: 84px; padding: 7px 4px; color: #17201e; background: transparent; border: 0; border-bottom: 1px solid transparent; outline: none; }
 .draft-table input:not([type="checkbox"]):focus { border-bottom-color: #114338; }
 .switch-label { display: inline-flex; align-items: center; gap: 5px; color: #526059; white-space: nowrap; }
