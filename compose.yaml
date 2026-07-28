@@ -1,0 +1,15 @@
+services:
+  xiaomaibu:
+    image: ${IMAGE:-ghcr.io/jeck5001/jia-pai:latest}
+    container_name: xiaomaibu-price-checker
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATA_DIR: /app/data
+      PORT: 3000
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    volumes:
+      - ./data:/app/data
