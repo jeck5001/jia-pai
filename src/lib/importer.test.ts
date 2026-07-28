@@ -35,7 +35,7 @@ describe('价格表导入', () => {
     expect(result.issues).toContainEqual(expect.objectContaining({ severity: 'error', message: expect.stringContaining('零售价') }));
   });
 
-  it('阻止相同 Item ID 导入不同价格', () => {
+  it('保留相同 Item ID 但不同价格的两条商品', () => {
     const result = importRows(
       [
         ['商品 Item ID', '商品名称', '零售价'],
@@ -44,7 +44,8 @@ describe('价格表导入', () => {
       ],
       options,
     );
-    expect(result.issues).toContainEqual(expect.objectContaining({ severity: 'error', message: expect.stringContaining('价格不同') }));
+    expect(result.issues.filter((issue) => issue.severity === 'error')).toEqual([]);
+    expect(result.catalog.products).toHaveLength(2);
   });
 
   it('正确读取带引号和逗号的 CSV 字段', () => {

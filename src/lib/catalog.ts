@@ -74,16 +74,7 @@ export function validateProducts(products: Product[]): ImportIssue[] {
 
     const normalizedItemId = normalizeText(product.itemId);
     const existingByItemId = normalizedItemId ? seenItemIds.get(normalizedItemId) : undefined;
-    if (existingByItemId && existingByItemId.priceCents !== product.priceCents) {
-      const existingRow = existingByItemId.sourceRow ?? products.indexOf(existingByItemId) + 1;
-      issues.push({
-        severity: 'error',
-        row,
-        rows: [existingRow, row],
-        productIds: [existingByItemId.id, product.id],
-        message: `与第 ${existingRow} 行「${existingByItemId.name}」的 Item ID 相同，但价格不同：${formatPrice(existingByItemId.priceCents)} 和 ${formatPrice(product.priceCents)}`,
-      });
-    } else if (existingByItemId) {
+    if (existingByItemId && existingByItemId.priceCents === product.priceCents) {
       issues.push({ severity: 'warning', row, rows: [existingByItemId.sourceRow ?? products.indexOf(existingByItemId) + 1, row], productIds: [existingByItemId.id, product.id], message: '与前一条商品重复，将只保留一条' });
     } else {
       const namePriceKey = `${normalizeText(product.name)}:${product.priceCents}`;
