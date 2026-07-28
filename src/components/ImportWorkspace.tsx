@@ -30,6 +30,7 @@ export function ImportWorkspace({ baseCatalog, onBack, onCatalogPublished, onPho
   const [fileName, setFileName] = useState('');
   const [previewQuery, setPreviewQuery] = useState('');
   const [status, setStatus] = useState('');
+  const [publishError, setPublishError] = useState('');
   const [isReading, setIsReading] = useState(false);
   const [adminToken, setAdminToken] = useState('');
   const [isPublishing, setIsPublishing] = useState(false);
@@ -45,6 +46,7 @@ export function ImportWorkspace({ baseCatalog, onBack, onCatalogPublished, onPho
 
     setIsReading(true);
     setStatus('');
+    setPublishError('');
     setFileName(file.name);
     try {
       const rows = await readSpreadsheet(file);
@@ -66,11 +68,13 @@ export function ImportWorkspace({ baseCatalog, onBack, onCatalogPublished, onPho
   function updateProduct(index: number, patch: Partial<Product>) {
     setDraft((products) => products.map((product, productIndex) => (productIndex === index ? { ...product, ...patch } : product)));
     setStatus('');
+    setPublishError('');
   }
 
   function removeProduct(index: number) {
     setDraft((products) => products.filter((_, productIndex) => productIndex !== index));
     setStatus('');
+    setPublishError('');
   }
 
   function resetDraft() {
@@ -79,9 +83,11 @@ export function ImportWorkspace({ baseCatalog, onBack, onCatalogPublished, onPho
     setFileName('');
     setPreviewQuery('');
     setStatus('');
+    setPublishError('');
   }
 
   function downloadCatalog() {
+    setPublishError('');
     const catalog = createPublishedCatalog(sourceLabel || fileName, effectiveAt, draft);
     const blob = new Blob([`${JSON.stringify(catalog, null, 2)}\n`], { type: 'application/json;charset=utf-8' });
     const url = URL.createObjectURL(blob);
@@ -96,12 +102,13 @@ export function ImportWorkspace({ baseCatalog, onBack, onCatalogPublished, onPho
   async function publishCatalogToServer() {
     setIsPublishing(true);
     setStatus('');
+    setPublishError('');
     try {
       const catalog = await publishCatalog(createPublishedCatalog(sourceLabel || fileName, effectiveAt, draft), adminToken);
       onCatalogPublished(catalog);
       setStatus(`已发布到 NAS，当前共 ${catalog.products.length} 条商品。`);
     } catch (error) {
-      setImportIssues([{ severity: 'error', message: error instanceof Error ? `发布失败：${error.message}` : '发布失败，请稍后重试' }]);
+      setPublishError(error instanceof Error ? `发布失败：${error.message}` : '发布失败，请稍后重试。');
     } finally {
       setIsPublishing(false);
     }
@@ -193,6 +200,8 @@ export function ImportWorkspace({ baseCatalog, onBack, onCatalogPublished, onPho
               </button>
             </div>
           </section>
+          {publishError ? <p className="publish-notice publish-notice-error" role="alert">{publishError}</p> : null}
+          {status ? <p className="publish-notice" role="status">{status}</p> : null}
           <div className="table-scroll">
             <table className="draft-table">
               <thead>
@@ -239,8 +248,6 @@ export function ImportWorkspace({ baseCatalog, onBack, onCatalogPublished, onPho
           </section>
         </>
       ) : null}
-
-      {status ? <p className="success-notice" role="status">{status}</p> : null}
     </main>
   );
 }

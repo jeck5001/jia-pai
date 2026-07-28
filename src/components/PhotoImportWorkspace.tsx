@@ -47,6 +47,7 @@ export function PhotoImportWorkspace({ baseCatalog, onBack, onCatalogPublished, 
   const [progress, setProgress] = useState<OcrProgress | null>(null);
   const [previewQuery, setPreviewQuery] = useState('');
   const [status, setStatus] = useState('');
+  const [publishError, setPublishError] = useState('');
   const [isConfirmed, setIsConfirmed] = useState(false);
   const [adminToken, setAdminToken] = useState('');
   const [isPublishing, setIsPublishing] = useState(false);
@@ -87,6 +88,7 @@ export function PhotoImportWorkspace({ baseCatalog, onBack, onCatalogPublished, 
     setProgress(null);
     setPreviewQuery('');
     setStatus('');
+    setPublishError('');
     setIsConfirmed(false);
 
     try {
@@ -118,18 +120,21 @@ export function PhotoImportWorkspace({ baseCatalog, onBack, onCatalogPublished, 
   function updateProduct(index: number, patch: Partial<Product>) {
     setDraft((products) => products.map((product, productIndex) => (productIndex === index ? { ...product, ...patch } : product)));
     setStatus('');
+    setPublishError('');
     setIsConfirmed(false);
   }
 
   function removeProduct(index: number) {
     setDraft((products) => products.filter((_, productIndex) => productIndex !== index));
     setStatus('');
+    setPublishError('');
     setIsConfirmed(false);
   }
 
   function addProduct() {
     setDraft((products) => [...products, createManualProduct(products.length + 1)]);
     setStatus('');
+    setPublishError('');
     setIsConfirmed(false);
   }
 
@@ -140,6 +145,7 @@ export function PhotoImportWorkspace({ baseCatalog, onBack, onCatalogPublished, 
     setPreviews([]);
     setPreviewQuery('');
     setStatus('');
+    setPublishError('');
     setIsConfirmed(false);
   }
 
@@ -154,6 +160,7 @@ export function PhotoImportWorkspace({ baseCatalog, onBack, onCatalogPublished, 
   }
 
   function downloadMergedCatalog() {
+    setPublishError('');
     const catalog = mergedCatalog();
     const blob = new Blob([`${JSON.stringify(catalog, null, 2)}\n`], { type: 'application/json;charset=utf-8' });
     const url = URL.createObjectURL(blob);
@@ -168,12 +175,13 @@ export function PhotoImportWorkspace({ baseCatalog, onBack, onCatalogPublished, 
   async function publishMergedCatalog() {
     setIsPublishing(true);
     setStatus('');
+    setPublishError('');
     try {
       const catalog = await publishCatalog(mergedCatalog(), adminToken);
       onCatalogPublished(catalog);
       setStatus(`已发布到 NAS，当前共 ${catalog.products.length} 条商品，本次新增 ${addedCount} 条。`);
     } catch (error) {
-      setIssues([{ severity: 'error', message: error instanceof Error ? `发布失败：${error.message}` : '发布失败，请稍后重试' }]);
+      setPublishError(error instanceof Error ? `发布失败：${error.message}` : '发布失败，请稍后重试。');
     } finally {
       setIsPublishing(false);
     }
@@ -268,6 +276,8 @@ export function PhotoImportWorkspace({ baseCatalog, onBack, onCatalogPublished, 
               </button>
             </div>
           </section>
+          {publishError ? <p className="publish-notice publish-notice-error" role="alert">{publishError}</p> : null}
+          {status ? <p className="publish-notice" role="status">{status}</p> : null}
           <div className="table-scroll">
             <table className="draft-table photo-draft-table">
               <thead>
@@ -317,8 +327,6 @@ export function PhotoImportWorkspace({ baseCatalog, onBack, onCatalogPublished, 
           </section>
         </>
       ) : null}
-
-      {status ? <p className="success-notice" role="status">{status}</p> : null}
     </main>
   );
 }
