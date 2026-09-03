@@ -11,7 +11,7 @@
 
 1. 在 NAS 中创建部署目录，例如 `/vol1/1000/xiaomaibu-price-checker`，只需放入本仓库的 `compose.yaml` 和 `.env.example`。
 2. 复制环境模板：`cp .env.example .env`。
-3. 编辑 `.env`，填写 `SUB2API_API_KEY`；建议同时设置随机的 `ADMIN_TOKEN`。内网 Sub2API 地址、视觉模型和 `SUB2API_TIMEOUT_MS` 已有默认值；默认单张图片最多等待 3 分钟，可按实际模型速度修改。
+3. 编辑 `.env`，填写 `SUB2API_API_KEY`；建议同时设置随机的 `ADMIN_TOKEN`。内网 Sub2API 地址、视觉模型和 `SUB2API_TIMEOUT_MS` 已有默认值；默认单张图片最多等待 3 分钟，可按实际模型速度修改。`SUB2API_MODEL` 是默认识别模型；照片识别页的模型下拉列表会实时读取 Sub2API 的可用模型。
 4. 在飞牛的终端或 Compose 管理界面执行：
 
 ```bash
@@ -72,7 +72,7 @@ GitHub 仓库与 GHCR 镜像均为公开访问，NAS 不需要 GitHub Token 或 
 3. 设置了 `ADMIN_TOKEN` 时，在发布区填写同一口令；未设置时可留空。
 4. 点击“发布到 NAS”，查询页会立即使用新价格表。“下载备份”可保存一份本地 JSON。
 
-照片只会从浏览器上传至当前 NAS 服务，再由 NAS 服务发送给配置的 Sub2API。浏览器不会看到或保存模型 API Key。识别结果是候选数据，必须人工核对手写改价、反光和模糊小字。
+照片只会从浏览器上传至当前 NAS 服务，再由 NAS 服务发送给配置的 Sub2API。浏览器不会看到或保存模型 API Key。照片识别页的识别模型列表实时读取自 Sub2API（`/api/vision/models` 由服务端携带密钥代查），选择只保存在本机浏览器中。识别结果是候选数据，必须人工核对手写改价、反光和模糊小字。
 
 ## 本地开发
 

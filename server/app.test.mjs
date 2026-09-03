@@ -94,6 +94,59 @@ describe('一体化服务', () => {
     }
   });
 
+  it('实时从 Sub2API 获取模型列表，并默认选中服务端配置的模型', async () => {
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: [{ id: 'claude-sonnet-4-5' }, { id: 'gpt-5.5' }, { id: 'gpt-5.5' }] }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ choices: [{ message: { content: '{"products":[]}' } }] }), { status: 200 }));
+    const app = await runningApp({ fetchImpl, sub2ApiKey: 'test-key', sub2ApiModel: 'gpt-5.5' });
+    try {
+      const modelsResponse = await fetch(`${app.baseUrl}/api/vision/models`);
+      expect(modelsResponse.status).toBe(200);
+      expect(await modelsResponse.json()).toEqual({ models: ['gpt-5.5', 'claude-sonnet-4-5'], default: 'gpt-5.5' });
+      expect(fetchImpl.mock.calls[0][0]).toBe('http://192.168.5.35:8084/v1/models');
+      expect(fetchImpl.mock.calls[0][1].headers.Authorization).toBe('Bearer test-key');
+
+      const recognizeResponse = await fetch(`${app.baseUrl}/api/vision/recognize`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageUrl: 'data:image/jpeg;base64,AA==', model: 'claude-sonnet-4-5' }),
+      });
+      expect(recognizeResponse.status).toBe(200);
+      expect(JSON.parse(fetchImpl.mock.calls[1][1].body).model).toBe('claude-sonnet-4-5');
+    } finally {
+      await app.close();
+    }
+  });
+
+  it('模型列表获取失败时返回可读错误，识别请求拒绝非法模型名并缺省回退默认模型', async () => {
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ error: { message: '无权限' } }), { status: 403 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ choices: [{ message: { content: '{"products":[]}' } }] }), { status: 200 }));
+    const app = await runningApp({ fetchImpl, sub2ApiKey: 'test-key' });
+    try {
+      const modelsResponse = await fetch(`${app.baseUrl}/api/vision/models`);
+      expect(modelsResponse.status).toBe(502);
+      expect((await modelsResponse.json()).error.message).toContain('无权限');
+
+      const illegalResponse = await fetch(`${app.baseUrl}/api/vision/recognize`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageUrl: 'data:image/jpeg;base64,AA==', model: 'bad model\nname' }),
+      });
+      expect(illegalResponse.status).toBe(400);
+
+      const defaultResponse = await fetch(`${app.baseUrl}/api/vision/recognize`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageUrl: 'data:image/jpeg;base64,AA==' }),
+      });
+      expect(defaultResponse.status).toBe(200);
+      expect(JSON.parse(fetchImpl.mock.calls[1][1].body).model).toBe('gpt-5.5');
+    } finally {
+      await app.close();
+    }
+  });
+
   it('记录脱敏网络错误码，并返回可操作的连接失败提示', async () => {
     const connectionError = Object.assign(new TypeError('fetch failed'), {
       cause: Object.assign(new Error('connect ECONNREFUSED'), { code: 'ECONNREFUSED' }),

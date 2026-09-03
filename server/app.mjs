@@ -10,6 +10,7 @@ const DEFAULT_WEB_ROOT = join(PROJECT_DIR, 'dist');
 const MAX_CATALOG_BYTES = 5 * 1024 * 1024;
 const MAX_VISION_BYTES = 15 * 1024 * 1024;
 const DEFAULT_SUB2API_TIMEOUT_MS = 180_000;
+const MODEL_LIST_TIMEOUT_MS = 15_000;
 
 const EXTRACTION_PROMPT = `你是小卖部价格表的结构化识别器。请读取图片中完整可见的价格表，识别每个商品行的 Item ID、商品名称、数量和零售价。
 
@@ -62,6 +63,12 @@ function completionUrl(baseUrl) {
   if (!/^https?:\/\//i.test(normalized)) throw new HttpError(503, '服务端 Sub2API 地址配置无效');
   if (/\/chat\/completions$/i.test(normalized)) return normalized;
   return `${normalized}${/\/v1$/i.test(normalized) ? '' : '/v1'}/chat/completions`;
+}
+
+function modelsUrl(baseUrl) {
+  const normalized = baseUrl.trim().replace(/\/+$/, '');
+  if (!/^https?:\/\//i.test(normalized)) throw new HttpError(503, '服务端 Sub2API 地址配置无效');
+  return `${normalized}${/\/v1$/i.test(normalized) ? '' : '/v1'}/models`;
 }
 
 function isRecord(value) {
@@ -250,7 +257,62 @@ async function createCatalogStore(config) {
   };
 }
 
-async function recognizeWithSub2Api(imageUrl, config) {
+const VISION_MODEL_PATTERN = /^[A-Za-z0-9._:@+/-]{1,128}$/;
+
+function resolveVisionModel(requestedModel, config) {
+  if (requestedModel === undefined || requestedModel === '') return config.sub2ApiModel;
+  if (typeof requestedModel !== 'string' || !VISION_MODEL_PATTERN.test(requestedModel.trim())) {
+    throw new HttpError(400, '识别模型名称不合法，请重新获取模型列表后选择');
+  }
+  return requestedModel.trim();
+}
+
+function parseModelIds(payload) {
+  if (!isRecord(payload)) return [];
+  const rows = Array.isArray(payload.data) ? payload.data : Array.isArray(payload.models) ? payload.models : [];
+  return [...new Set(rows
+    .map((row) => (typeof row === 'string' ? row : isRecord(row) && typeof row.id === 'string' ? row.id : ''))
+    .map((id) => id.trim())
+    .filter(Boolean))];
+}
+
+async function fetchSub2ApiModels(config) {
+  if (!config.sub2ApiKey) throw new HttpError(503, '服务端未配置 SUB2API_API_KEY');
+
+  const endpoint = modelsUrl(config.sub2ApiBaseUrl);
+  let upstream;
+  try {
+    upstream = await config.fetchImpl(endpoint, {
+      headers: { Authorization: `Bearer ${config.sub2ApiKey}` },
+      signal: AbortSignal.timeout(MODEL_LIST_TIMEOUT_MS),
+    });
+  } catch (error) {
+    const details = networkFailureDetails(error);
+    console.error('[vision] Sub2API model list fetch failed', {
+      endpoint: serviceOrigin(endpoint),
+      errorCode: details.code ?? 'UNKNOWN',
+      errorType: details.type,
+      timeoutMs: MODEL_LIST_TIMEOUT_MS,
+    });
+    throw new HttpError(502, networkFailureMessage(details));
+  }
+
+  const payload = await upstream.json().catch(() => null);
+  if (!upstream.ok) {
+    const message = isRecord(payload) && isRecord(payload.error) ? asString(payload.error.message) : undefined;
+    console.warn('[vision] Sub2API model list returned an error response', {
+      endpoint: serviceOrigin(endpoint),
+      status: upstream.status,
+    });
+    throw new HttpError(502, message ? `获取模型列表失败：${message}` : `获取模型列表失败（HTTP ${upstream.status}）`);
+  }
+
+  const models = parseModelIds(payload);
+  if (!models.length) throw new HttpError(502, 'Sub2API 未返回可用模型，请检查服务状态');
+  return [config.sub2ApiModel, ...models.filter((model) => model !== config.sub2ApiModel)];
+}
+
+async function recognizeWithSub2Api(imageUrl, model, config) {
   if (typeof imageUrl !== 'string' || !imageUrl.startsWith('data:image/')) {
     throw new HttpError(400, '请上传有效的图片');
   }
@@ -266,7 +328,7 @@ async function recognizeWithSub2Api(imageUrl, config) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: config.sub2ApiModel,
+        model,
         temperature: 0,
         messages: [
           { role: 'system', content: '你只输出用户要求的 JSON。' },
@@ -314,6 +376,10 @@ export async function createApp(overrides = {}) {
         writeJson(response, 200, { status: 'ok', visionConfigured: Boolean(config.sub2ApiKey) });
         return;
       }
+      if (request.method === 'GET' && url.pathname === '/api/vision/models') {
+        writeJson(response, 200, { models: await fetchSub2ApiModels(config), default: config.sub2ApiModel });
+        return;
+      }
       if (request.method === 'GET' && url.pathname === '/api/catalog') {
         writeJson(response, 200, await catalogStore.read());
         return;
@@ -325,7 +391,8 @@ export async function createApp(overrides = {}) {
       }
       if (request.method === 'POST' && url.pathname === '/api/vision/recognize') {
         const body = await readJsonBody(request, MAX_VISION_BYTES);
-        writeJson(response, 200, { content: await recognizeWithSub2Api(body.imageUrl, config) });
+        const model = resolveVisionModel(body.model, config);
+        writeJson(response, 200, { content: await recognizeWithSub2Api(body.imageUrl, model, config) });
         return;
       }
       if (request.method === 'GET' || request.method === 'HEAD') {

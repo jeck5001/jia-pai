@@ -1,7 +1,7 @@
-import { AlertCircle, AlertTriangle, Camera, CheckCircle2, Download, ImagePlus, Plus, RefreshCw, RotateCcw, Search, Upload, X } from 'lucide-react';
+import { AlertCircle, AlertTriangle, Camera, CheckCircle2, Cpu, Download, ImagePlus, Plus, RefreshCw, RotateCcw, Search, Upload, X } from 'lucide-react';
 import { ChangeEvent, useEffect, useState } from 'react';
 import { formatPrice, parsePriceToCents, priceForInput, searchProducts, stripDraftMetadata, uniqueProducts, validateProducts } from '../lib/catalog';
-import { publishCatalog } from '../lib/server-api';
+import { fetchVisionModels, publishCatalog } from '../lib/server-api';
 import { recognizePhotoWithServer } from '../lib/vision-import';
 import type { Catalog, ImportIssue, Product } from '../types';
 
@@ -11,6 +11,8 @@ type PhotoImportWorkspaceProps = {
   onCatalogPublished: (catalog: Catalog) => void;
   onSpreadsheetImport: () => void;
 };
+
+const VISION_MODEL_STORAGE_KEY = 'xiaomaibu-vision-model';
 
 type OcrProgress = {
   percent: number;
@@ -51,6 +53,41 @@ export function PhotoImportWorkspace({ baseCatalog, onBack, onCatalogPublished, 
   const [isConfirmed, setIsConfirmed] = useState(false);
   const [adminToken, setAdminToken] = useState('');
   const [isPublishing, setIsPublishing] = useState(false);
+  const [visionModels, setVisionModels] = useState<string[]>([]);
+  const [selectedModel, setSelectedModel] = useState('');
+  const [modelsLoading, setModelsLoading] = useState(true);
+  const [modelsError, setModelsError] = useState('');
+  const [modelsReloadKey, setModelsReloadKey] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    setModelsLoading(true);
+    setModelsError('');
+    fetchVisionModels()
+      .then(({ models, default: defaultModel }) => {
+        if (cancelled) return;
+        setVisionModels(models);
+        let savedModel: string | null = null;
+        try {
+          savedModel = window.localStorage.getItem(VISION_MODEL_STORAGE_KEY);
+        } catch {
+          savedModel = null;
+        }
+        setSelectedModel(savedModel && models.includes(savedModel) ? savedModel : defaultModel);
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          setVisionModels([]);
+          setModelsError(error instanceof Error ? error.message : '无法获取模型列表');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setModelsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [modelsReloadKey]);
 
   useEffect(() => () => {
     previews.forEach((preview) => URL.revokeObjectURL(preview.url));
@@ -76,6 +113,19 @@ export function PhotoImportWorkspace({ baseCatalog, onBack, onCatalogPublished, 
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     target.scrollIntoView({ behavior: reducedMotion ? 'auto' : 'smooth', block: 'center' });
     target.querySelector<HTMLInputElement>('input')?.focus({ preventScroll: true });
+  }
+
+  function handleModelChange(value: string) {
+    setSelectedModel(value);
+    try {
+      window.localStorage.setItem(VISION_MODEL_STORAGE_KEY, value);
+    } catch {
+      // 存储不可用时仅保留本次会话的选择。
+    }
+  }
+
+  function reloadVisionModels() {
+    setModelsReloadKey((key) => key + 1);
   }
 
   async function handleImageChange(event: ChangeEvent<HTMLInputElement>) {
@@ -106,7 +156,7 @@ export function PhotoImportWorkspace({ baseCatalog, onBack, onCatalogPublished, 
           sourceImage: file.name,
           sourceLabel: `大模型导入：${file.name}`,
         };
-        const result = await recognizePhotoWithServer(file, source);
+        const result = await recognizePhotoWithServer(file, source, selectedModel || undefined);
         nextProducts.push(...result.products);
         nextIssues.push(...result.issues);
       }
@@ -217,9 +267,27 @@ export function PhotoImportWorkspace({ baseCatalog, onBack, onCatalogPublished, 
         <p>{baseCatalog ? `将与当前 ${existingCount} 条已发布商品合并并直接发布` : '识别后可直接发布到当前 NAS 服务'}</p>
       </section>
 
-      <p className="service-note">模型、服务地址和 API Key 均由 NAS 服务端配置，不会发送到浏览器。</p>
+      <p className="service-note">识别模型实时读取自 NAS 配置的 Sub2API；服务地址和 API Key 不会发送到浏览器。</p>
 
       <section className="photo-controls" aria-label="价格表照片导入">
+        {visionModels.length ? (
+          <div className="model-picker" role="group" aria-label="识别模型">
+            <Cpu size={18} aria-hidden="true" />
+            <select value={selectedModel} onChange={(event) => handleModelChange(event.target.value)} disabled={isRecognizing || modelsLoading} aria-label="识别模型">
+              {visionModels.map((model) => <option key={model} value={model}>{model}</option>)}
+            </select>
+            <button className="model-refresh" type="button" onClick={reloadVisionModels} disabled={modelsLoading || isRecognizing} aria-label="刷新模型列表" title="刷新模型列表">
+              <RefreshCw className={modelsLoading ? 'spin' : undefined} size={14} aria-hidden="true" />
+            </button>
+          </div>
+        ) : modelsLoading ? (
+          <span className="model-picker-note"><RefreshCw className="spin" size={15} aria-hidden="true" />正在获取模型列表…</span>
+        ) : modelsError ? (
+          <button className="text-button model-retry" type="button" onClick={reloadVisionModels}>
+            <RefreshCw size={15} aria-hidden="true" />
+            模型列表获取失败，点击重试
+          </button>
+        ) : null}
         <label className="file-picker photo-picker" title="拍照或选择价格表照片">
           <input type="file" accept="image/*" multiple onChange={handleImageChange} disabled={isRecognizing} />
           {isRecognizing ? <RefreshCw className="spin" size={18} aria-hidden="true" /> : <Camera size={18} aria-hidden="true" />}

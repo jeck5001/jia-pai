@@ -61,11 +61,35 @@ export async function publishCatalog(catalog: Catalog, adminToken: string): Prom
   return response.json() as Promise<Catalog>;
 }
 
-export async function recognizeImage(imageUrl: string): Promise<string> {
+export type VisionModels = {
+  models: string[];
+  default: string;
+};
+
+export async function fetchVisionModels(): Promise<VisionModels> {
+  const response = await fetch(apiUrl('/api/vision/models'), { cache: 'no-store' });
+  if (!response.ok) throw new Error(await readError(response, '模型列表请求失败'));
+  const payload: unknown = await response.json();
+  if (!payload || typeof payload !== 'object' || !Array.isArray((payload as { models?: unknown }).models)) {
+    throw new Error('服务端未返回可用的模型列表');
+  }
+  const models = (payload as { models: unknown[] }).models
+    .filter((model): model is string => typeof model === 'string' && Boolean(model.trim()))
+    .map((model) => model.trim());
+  if (!models.length) throw new Error('服务端未返回可用的模型列表');
+  const defaultModel = (payload as { default?: unknown }).default;
+  return {
+    models,
+    default: models.includes(typeof defaultModel === 'string' ? defaultModel : '') ? (defaultModel as string) : models[0],
+  };
+}
+
+export async function recognizeImage(imageUrl: string, model?: string): Promise<string> {
+  const trimmedModel = model?.trim();
   const response = await fetch(apiUrl('/api/vision/recognize'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ imageUrl }),
+    body: JSON.stringify({ imageUrl, ...(trimmedModel ? { model: trimmedModel } : {}) }),
   });
   if (!response.ok) throw new Error(await readError(response, '图片识别失败'));
   const payload: unknown = await response.json();

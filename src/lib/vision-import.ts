@@ -125,7 +125,7 @@ export function parseVisionTable(content: string, source: PhotoImportSource): Ph
   return { products, issues };
 }
 
-export async function recognizePhotoWithServer(file: File, source: PhotoImportSource): Promise<PhotoTableParseResult> {
+export async function recognizePhotoWithServer(file: File, source: PhotoImportSource, model?: string): Promise<PhotoTableParseResult> {
   const imageUrl = await imageForVision(file);
-  return parseVisionTable(await recognizeImage(imageUrl), source);
+  return parseVisionTable(await recognizeImage(imageUrl, model), source);
 }
