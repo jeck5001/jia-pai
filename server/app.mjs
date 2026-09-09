@@ -10,14 +10,18 @@ const DEFAULT_WEB_ROOT = join(PROJECT_DIR, 'dist');
 const MAX_CATALOG_BYTES = 5 * 1024 * 1024;
 const MAX_VISION_BYTES = 15 * 1024 * 1024;
 const DEFAULT_SUB2API_TIMEOUT_MS = 180_000;
+const DEFAULT_SUB2API_MAX_TOKENS = 16_000;
+const MAX_SUB2API_MAX_TOKENS = 128_000;
 const MODEL_LIST_TIMEOUT_MS = 15_000;
 
 const EXTRACTION_PROMPT = `你是小卖部价格表的结构化识别器。请读取图片中完整可见的价格表，识别每个商品行的 Item ID、商品名称、数量和零售价。
 
-严格只返回 JSON，不要 Markdown、解释或代码块。格式必须是：
+响应的第一个字符必须是 {，最后一个字符必须是 }。不要输出 Markdown 代码块、前言、结语或任何解释文字。
+格式必须是：
 {"products":[{"itemId":"981102169","name":"商品名称","quantity":10,"price":45}],"notes":[]}
 
-规则：price 是人民币元数值，不要货币符号；Item ID 只保留原始数字；无法确认的字段用 null；不要虚构商品；忽略表头、页边残留和无关手写备注。若印刷价格被手写修改，以清楚可见的最新价格为准，并把不确定处写入 notes。`;
+规则：price 是人民币元数值，不要货币符号；Item ID 只保留原始数字；无法确认的字段用 null；不要虚构商品；忽略表头、页边残留和无关手写备注。若印刷价格被手写修改，以清楚可见的最新价格为准，并把不确定处写入 notes。
+商品行很多时也必须保持 JSON 结构完整，宁可少输出几行，也不要输出被截断的半个对象。`;
 
 const CONTENT_TYPES = {
   '.css': 'text/css; charset=utf-8',
@@ -44,6 +48,12 @@ function readTimeoutMs(value) {
   return Number.isSafeInteger(timeoutMs) && timeoutMs >= 1_000 ? timeoutMs : DEFAULT_SUB2API_TIMEOUT_MS;
 }
 
+function readMaxTokens(value) {
+  const maxTokens = Number(value);
+  if (!Number.isSafeInteger(maxTokens) || maxTokens < 1_024) return DEFAULT_SUB2API_MAX_TOKENS;
+  return Math.min(maxTokens, MAX_SUB2API_MAX_TOKENS);
+}
+
 function readConfig(overrides = {}) {
   return {
     adminToken: overrides.adminToken ?? process.env.ADMIN_TOKEN?.trim() ?? '',
@@ -53,6 +63,7 @@ function readConfig(overrides = {}) {
     sub2ApiBaseUrl: overrides.sub2ApiBaseUrl ?? process.env.SUB2API_BASE_URL?.trim() ?? 'http://192.168.5.35:8084/',
     sub2ApiKey: overrides.sub2ApiKey ?? process.env.SUB2API_API_KEY?.trim() ?? '',
     sub2ApiModel: overrides.sub2ApiModel ?? process.env.SUB2API_MODEL?.trim() ?? 'gpt-5.5',
+    sub2ApiMaxTokens: readMaxTokens(overrides.sub2ApiMaxTokens ?? process.env.SUB2API_MAX_TOKENS),
     sub2ApiTimeoutMs: readTimeoutMs(overrides.sub2ApiTimeoutMs ?? process.env.SUB2API_TIMEOUT_MS),
     webRoot: overrides.webRoot ?? process.env.WEB_ROOT ?? DEFAULT_WEB_ROOT,
   };
@@ -102,22 +113,33 @@ function networkFailureMessage(details) {
   return '无法连接 Sub2API 服务。请查看 NAS 容器日志中的 [vision] 记录。';
 }
 
-function visionResponseText(payload) {
+function visionResponse(payload) {
   if (!isRecord(payload) || !Array.isArray(payload.choices) || !isRecord(payload.choices[0])) {
     throw new HttpError(502, 'Sub2API 返回格式不符合 OpenAI 兼容协议');
   }
-  const message = payload.choices[0].message;
+  const choice = payload.choices[0];
+  const finishReason = asString(choice.finish_reason) ?? asString(choice.finishReason) ?? '';
+  const message = choice.message;
   if (!isRecord(message)) throw new HttpError(502, 'Sub2API 未返回识别内容');
-  if (typeof message.content === 'string') return message.content;
-  if (Array.isArray(message.content)) {
-    const text = message.content
+  let text = '';
+  if (typeof message.content === 'string') text = message.content.trim();
+  else if (Array.isArray(message.content)) {
+    text = message.content
       .filter(isRecord)
-      .map((part) => typeof part.text === 'string' ? part.text : '')
+      .map((part) => (typeof part.text === 'string' ? part.text : typeof part.content === 'string' ? part.content : ''))
       .join('\n')
       .trim();
-    if (text) return text;
   }
-  throw new HttpError(502, 'Sub2API 未返回可解析的识别内容');
+  if (!text) text = asString(message.reasoning_content) ?? asString(message.reasoning) ?? '';
+  if (!text) {
+    throw new HttpError(
+      502,
+      finishReason
+        ? `Sub2API 未返回可解析的识别内容（finish_reason=${finishReason}）。若为 length/content_filter，请调大 SUB2API_MAX_TOKENS 或换模型。`
+        : 'Sub2API 未返回可解析的识别内容',
+    );
+  }
+  return { content: text, finishReason };
 }
 
 function catalogIsValid(value) {
@@ -330,6 +352,7 @@ async function recognizeWithSub2Api(imageUrl, model, config) {
       body: JSON.stringify({
         model,
         temperature: 0,
+        max_tokens: config.sub2ApiMaxTokens,
         messages: [
           { role: 'system', content: '你只输出用户要求的 JSON。' },
           {
@@ -363,7 +386,7 @@ async function recognizeWithSub2Api(imageUrl, model, config) {
     });
     throw new HttpError(502, message ? `Sub2API 请求失败：${message}` : `Sub2API 请求失败（HTTP ${upstream.status}）`);
   }
-  return visionResponseText(payload);
+  return visionResponse(payload);
 }
 
 export async function createApp(overrides = {}) {
@@ -392,7 +415,11 @@ export async function createApp(overrides = {}) {
       if (request.method === 'POST' && url.pathname === '/api/vision/recognize') {
         const body = await readJsonBody(request, MAX_VISION_BYTES);
         const model = resolveVisionModel(body.model, config);
-        writeJson(response, 200, { content: await recognizeWithSub2Api(body.imageUrl, model, config) });
+        const result = await recognizeWithSub2Api(body.imageUrl, model, config);
+        if (result.finishReason === 'length') {
+          console.warn('[vision] model output truncated by max_tokens', { model, maxTokens: config.sub2ApiMaxTokens });
+        }
+        writeJson(response, 200, { content: result.content, finishReason: result.finishReason || null });
         return;
       }
       if (request.method === 'GET' || request.method === 'HEAD') {

@@ -84,7 +84,12 @@ export async function fetchVisionModels(): Promise<VisionModels> {
   };
 }
 
-export async function recognizeImage(imageUrl: string, model?: string): Promise<string> {
+export type VisionRecognition = {
+  content: string;
+  finishReason: string;
+};
+
+export async function recognizeImage(imageUrl: string, model?: string): Promise<VisionRecognition> {
   const trimmedModel = model?.trim();
   const response = await fetch(apiUrl('/api/vision/recognize'), {
     method: 'POST',
@@ -96,5 +101,9 @@ export async function recognizeImage(imageUrl: string, model?: string): Promise<
   if (!payload || typeof payload !== 'object' || typeof (payload as { content?: unknown }).content !== 'string') {
     throw new Error('服务端未返回可解析的识别内容');
   }
-  return (payload as { content: string }).content;
+  const finishReason = (payload as { finishReason?: unknown }).finishReason;
+  return {
+    content: (payload as { content: string }).content,
+    finishReason: typeof finishReason === 'string' ? finishReason : '',
+  };
 }

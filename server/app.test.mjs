@@ -147,6 +147,46 @@ describe('一体化服务', () => {
     }
   });
 
+  it('传递 max_tokens 并回传 finish_reason，让截断可被识别', async () => {
+    const fetchImpl = vi.fn().mockResolvedValueOnce(new Response(JSON.stringify({
+      choices: [{ message: { content: '{"products":[{"name":"三养火鸡面 140g","price":7}]' }, finish_reason: 'length' }],
+    }), { status: 200 }));
+    const app = await runningApp({ fetchImpl, sub2ApiKey: 'test-key', sub2ApiMaxTokens: 32_000 });
+    try {
+      const response = await fetch(`${app.baseUrl}/api/vision/recognize`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageUrl: 'data:image/jpeg;base64,AA==' }),
+      });
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({
+        content: '{"products":[{"name":"三养火鸡面 140g","price":7}]',
+        finishReason: 'length',
+      });
+      expect(JSON.parse(fetchImpl.mock.calls[0][1].body).max_tokens).toBe(32_000);
+    } finally {
+      await app.close();
+    }
+  });
+
+  it('模型返回空内容时把 finish_reason 写进错误提示', async () => {
+    const fetchImpl = vi.fn().mockResolvedValueOnce(new Response(JSON.stringify({
+      choices: [{ message: { content: '' }, finish_reason: 'content_filter' }],
+    }), { status: 200 }));
+    const app = await runningApp({ fetchImpl, sub2ApiKey: 'test-key' });
+    try {
+      const response = await fetch(`${app.baseUrl}/api/vision/recognize`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageUrl: 'data:image/jpeg;base64,AA==' }),
+      });
+      expect(response.status).toBe(502);
+      expect((await response.json()).error.message).toContain('content_filter');
+    } finally {
+      await app.close();
+    }
+  });
+
   it('记录脱敏网络错误码，并返回可操作的连接失败提示', async () => {
     const connectionError = Object.assign(new TypeError('fetch failed'), {
       cause: Object.assign(new Error('connect ECONNREFUSED'), { code: 'ECONNREFUSED' }),

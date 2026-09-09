@@ -42,6 +42,34 @@ docker exec xiaomaibu-price-checker node --input-type=module -e 'const base = (p
 
 `status` 为 `200` 或 `401` 说明网络已通；`ECONNREFUSED` 表示端口或服务未开放，`ENOTFOUND` 表示地址/DNS 错误。日志中的 `timeoutMs` 是本次请求实际允许的最长时间；超时通常表示 NAS 与 Sub2API 不在可达网络、被防火墙拦截，或模型处理时间超过该值。
 
+### 提示“大模型返回不是有效 JSON”
+
+该提示来自前端的 JSON 解析，不表示模型返回了乱码。常见原因按可能性排序：
+
+1. **输出被 `max_tokens` 截断**。服务端默认发送 `max_tokens`（`SUB2API_MAX_TOKENS`，默认 16000）。Claude 类模型经 Sub2API 转发时若不显式传该参数，往往被限制在 4096，整张价格表的 JSON 会被拦腰砍断。现在页面会直接提示“输出被 max_tokens 截断”，并已自动恢复其中完整的商品行。
+2. **模型在 JSON 前后加了说明文字或代码围栏**。解析器已会忽略围栏与寒暄，只抽取其中的 JSON。
+3. **模型确实没按格式回答**。此时提示会附带实际返回内容的前 200 字，浏览器控制台 `[vision]` 日志会打印完整原文，据此再决定是换模型还是改提示词。
+
+排查时可在 NAS 上用一张小图直接问 Sub2API，确认原始返回和 `finish_reason`（把 `MODEL` 换成实际模型名）：
+
+```bash
+docker exec -i xiaomaibu-price-checker node --input-type=module <<'EOF'
+const base = (process.env.SUB2API_BASE_URL || '').replace(/\/+$/, '');
+const url = `${base}${/\/v1$/i.test(base) ? '' : '/v1'}/chat/completions`;
+const response = await fetch(url, {
+  method: 'POST',
+  headers: { Authorization: `Bearer ${process.env.SUB2API_API_KEY}`, 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    model: 'claude-opus-4-8',
+    max_tokens: 16000,
+    messages: [{ role: 'user', content: [{ type: 'text', text: '只返回 {"ok":true}' }] }],
+  }),
+});
+const payload = await response.json();
+console.log(response.status, payload.choices?.[0]?.finish_reason, JSON.stringify(payload.choices?.[0]?.message?.content ?? payload.error).slice(0, 300));
+EOF
+```
+
 第一次启动会在 `data/products.json` 创建空价格表。通过页面导入表格或照片并点击“发布到 NAS”后，数据会直接写入这个持久化文件。备份时可复制 `data/products.json`，恢复后执行 `docker compose restart`。
 
 GitHub `main` 每次推送都会自动构建 `latest` 镜像。升级 NAS 服务：

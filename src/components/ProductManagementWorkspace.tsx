@@ -1,7 +1,8 @@
-import { AlertCircle, AlertTriangle, CheckCircle2, Plus, RefreshCw, RotateCcw, Save, Search, X } from 'lucide-react';
+import { AlertCircle, AlertTriangle, ArrowUpDown, CheckCircle2, Plus, RefreshCw, RotateCcw, Save, Search, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { normalizeText, productSearchText, priceForInput, parsePriceToCents, uniqueProducts, validateProducts } from '../lib/catalog';
 import { createManagedCatalog, createManagedProduct } from '../lib/catalog-management';
+import { PRODUCT_SORT_HINTS, PRODUCT_SORT_OPTIONS, sortProducts, type ProductSortMode } from '../lib/catalog-sort';
 import { publishCatalog } from '../lib/server-api';
 import type { Catalog, ImportIssue, Product } from '../types';
 
@@ -41,6 +42,8 @@ export function ProductManagementWorkspace({ baseCatalog, onBack, onCatalogPubli
   const [effectiveAt, setEffectiveAt] = useState(() => toDateTimeInput(baseCatalog?.effectiveAt ?? null));
   const [query, setQuery] = useState('');
   const [visibility, setVisibility] = useState<VisibilityFilter>('all');
+  const [sortMode, setSortMode] = useState<ProductSortMode>('manual');
+  const [publishedOrder, setPublishedOrder] = useState<Product[]>(() => baseCatalog?.products ?? []);
   const [adminToken, setAdminToken] = useState('');
   const [status, setStatus] = useState('');
   const [publishError, setPublishError] = useState('');
@@ -51,6 +54,8 @@ export function ProductManagementWorkspace({ baseCatalog, onBack, onCatalogPubli
     setDraft(baseCatalog.products);
     setSourceLabel(baseCatalog.sourceLabel);
     setEffectiveAt(toDateTimeInput(baseCatalog.effectiveAt));
+    setPublishedOrder(baseCatalog.products);
+    setSortMode('manual');
     setPublishError('');
   }, [baseCatalog]);
 
@@ -87,11 +92,20 @@ export function ProductManagementWorkspace({ baseCatalog, onBack, onCatalogPubli
     setPublishError('');
   }
 
+  function applySort(mode: ProductSortMode) {
+    setSortMode(mode);
+    setDraft((products) => sortProducts(products, mode, publishedOrder));
+    setStatus(mode === 'manual' ? '已恢复为当前已发布的商品顺序。' : PRODUCT_SORT_HINTS[mode]);
+    setPublishError('');
+  }
+
   function resetDraft() {
     if (!baseCatalog) return;
     setDraft(baseCatalog.products);
     setSourceLabel(baseCatalog.sourceLabel);
     setEffectiveAt(toDateTimeInput(baseCatalog.effectiveAt));
+    setPublishedOrder(baseCatalog.products);
+    setSortMode('manual');
     setQuery('');
     setPublishError('');
     setStatus('已恢复为当前已发布的商品目录。');
@@ -167,6 +181,12 @@ export function ProductManagementWorkspace({ baseCatalog, onBack, onCatalogPubli
               <button type="button" className={visibility === 'active' ? 'active' : ''} onClick={() => setVisibility('active')}>上架</button>
               <button type="button" className={visibility === 'inactive' ? 'active' : ''} onClick={() => setVisibility('inactive')}>下架</button>
             </div>
+            <label className="manage-sort">
+              <ArrowUpDown size={15} aria-hidden="true" />
+              <select value={sortMode} onChange={(event) => applySort(event.target.value as ProductSortMode)} disabled={isPublishing} aria-label="商品排序">
+                {PRODUCT_SORT_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+              </select>
+            </label>
           </section>
 
           <section className="draft-toolbar manage-draft-toolbar">
@@ -174,6 +194,7 @@ export function ProductManagementWorkspace({ baseCatalog, onBack, onCatalogPubli
               <span className="eyebrow">商品目录</span>
               <h2>{draft.length} 条商品，{activeCount} 条上架</h2>
               {deduplicatedCount !== draft.length ? <p className="dedupe-note">检测到 {draft.length - deduplicatedCount} 条同价重复记录，发布时会自动只保留一条。</p> : null}
+              {sortMode !== 'manual' ? <p className="dedupe-note sort-note">已选择「{PRODUCT_SORT_OPTIONS.find((option) => option.value === sortMode)?.label}」，发布后按此顺序展示；切回「当前顺序」可恢复原目录顺序。</p> : null}
             </div>
             <div className="manage-actions">
               <button className="text-button" type="button" onClick={resetDraft} disabled={isPublishing}>
