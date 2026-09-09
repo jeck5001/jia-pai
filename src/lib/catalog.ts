@@ -43,13 +43,16 @@ export function productSearchText(product: Product): string {
   );
 }
 
+/**
+ * 按关键词筛选上架商品，并保持已发布目录中的顺序。
+ * 展示顺序由商品管理里的排序决定（发布后即写入目录顺序），
+ * 查询页不再按名称重排，否则管理员选的排序会被覆盖掉。
+ */
 export function searchProducts(products: Product[], query: string): Product[] {
   const normalizedQuery = normalizeText(query);
   if (!normalizedQuery) return [];
 
-  return products
-    .filter((product) => product.active && productSearchText(product).includes(normalizedQuery))
-    .sort((left, right) => left.name.localeCompare(right.name, 'zh-CN'));
+  return products.filter((product) => product.active && productSearchText(product).includes(normalizedQuery));
 }
 
 export function productKey(product: Pick<Product, 'itemId' | 'name' | 'specification'>): string {

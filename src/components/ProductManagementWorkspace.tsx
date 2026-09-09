@@ -1,8 +1,16 @@
-import { AlertCircle, AlertTriangle, ArrowUpDown, CheckCircle2, Plus, RefreshCw, RotateCcw, Save, Search, X } from 'lucide-react';
+import { AlertCircle, AlertTriangle, ArrowDown, ArrowUp, ArrowUpDown, CheckCircle2, ChevronsUpDown, Plus, RefreshCw, RotateCcw, Save, Search, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { normalizeText, productSearchText, priceForInput, parsePriceToCents, uniqueProducts, validateProducts } from '../lib/catalog';
 import { createManagedCatalog, createManagedProduct } from '../lib/catalog-management';
-import { PRODUCT_SORT_HINTS, PRODUCT_SORT_OPTIONS, sortProducts, type ProductSortMode } from '../lib/catalog-sort';
+import {
+  PRODUCT_SORT_HINTS,
+  PRODUCT_SORT_OPTIONS,
+  SORT_COLUMN_MODES,
+  nextSortMode,
+  sortProducts,
+  type ProductSortMode,
+  type SortColumn,
+} from '../lib/catalog-sort';
 import { publishCatalog } from '../lib/server-api';
 import type { Catalog, ImportIssue, Product } from '../types';
 
@@ -95,8 +103,26 @@ export function ProductManagementWorkspace({ baseCatalog, onBack, onCatalogPubli
   function applySort(mode: ProductSortMode) {
     setSortMode(mode);
     setDraft((products) => sortProducts(products, mode, publishedOrder));
-    setStatus(mode === 'manual' ? '已恢复为当前已发布的商品顺序。' : PRODUCT_SORT_HINTS[mode]);
+    setStatus(PRODUCT_SORT_HINTS[mode] ?? '已重新排序，保存并发布后按此顺序展示。');
     setPublishError('');
+  }
+
+  /** 点击表头排序：作用于全部商品，不受当前筛选关键词影响。 */
+  function sortableHeader(column: SortColumn, label: string) {
+    const { asc, desc } = SORT_COLUMN_MODES[column];
+    const direction = sortMode === asc ? 'asc' : sortMode === desc ? 'desc' : undefined;
+    const Icon = direction === 'asc' ? ArrowUp : direction === 'desc' ? ArrowDown : ChevronsUpDown;
+    return (
+      <th
+        className={direction ? 'sortable-heading active' : 'sortable-heading'}
+        aria-sort={direction === 'asc' ? 'ascending' : direction === 'desc' ? 'descending' : 'none'}
+      >
+        <button type="button" onClick={() => applySort(nextSortMode(column, sortMode))} disabled={isPublishing}>
+          {label}
+          <Icon size={13} aria-hidden="true" />
+        </button>
+      </th>
+    );
   }
 
   function resetDraft() {
@@ -194,7 +220,9 @@ export function ProductManagementWorkspace({ baseCatalog, onBack, onCatalogPubli
               <span className="eyebrow">商品目录</span>
               <h2>{draft.length} 条商品，{activeCount} 条上架</h2>
               {deduplicatedCount !== draft.length ? <p className="dedupe-note">检测到 {draft.length - deduplicatedCount} 条同价重复记录，发布时会自动只保留一条。</p> : null}
-              {sortMode !== 'manual' ? <p className="dedupe-note sort-note">已选择「{PRODUCT_SORT_OPTIONS.find((option) => option.value === sortMode)?.label}」，发布后按此顺序展示；切回「当前顺序」可恢复原目录顺序。</p> : null}
+              {sortMode !== 'manual'
+                ? <p className="dedupe-note sort-note">已按「{PRODUCT_SORT_OPTIONS.find((option) => option.value === sortMode)?.label}」排序，发布后查价页就按这个顺序展示；点「当前顺序」可恢复原目录顺序。</p>
+                : <p className="dedupe-note sort-hint">提示：点击表头（商品 / Item ID / 零售价 / 库存 / 状态）即可排序，再点一次切换升降序。</p>}
             </div>
             <div className="manage-actions">
               <button className="text-button" type="button" onClick={resetDraft} disabled={isPublishing}>
@@ -278,13 +306,13 @@ export function ProductManagementWorkspace({ baseCatalog, onBack, onCatalogPubli
             <table className="draft-table manage-table">
               <thead>
                 <tr>
-                  <th>商品</th>
+                  {sortableHeader('name', '商品')}
                   {hasSpecifications ? <th>规格</th> : null}
-                  <th>Item ID</th>
-                  <th>零售价</th>
-                  <th>库存</th>
+                  {sortableHeader('itemId', 'Item ID')}
+                  {sortableHeader('price', '零售价')}
+                  {sortableHeader('stock', '库存')}
                   {hasBarcodesOrAliases ? <th>条码 / 别名</th> : null}
-                  <th>状态</th>
+                  {sortableHeader('active', '状态')}
                   <th><span className="sr-only">删除</span></th>
                 </tr>
               </thead>

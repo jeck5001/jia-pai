@@ -42,6 +42,19 @@ describe('价格和查询', () => {
     expect(searchProducts(products, '洗手')).toEqual([]);
   });
 
+  it('查询结果保留已发布目录中的顺序，不再按名称重排', () => {
+    // 目录已按“价格从低到高”发布：可乐 300 → 面包 850 → 矿泉水 200。
+    // 名称的拼音序是 可乐 → 矿泉水 → 面包，一旦查询页重排就会变成该顺序。
+    const published: Product[] = [
+      { id: 'cola', itemId: '980000001', name: '可乐', priceCents: 300, active: true },
+      { id: 'bread', itemId: '980000002', name: '面包', priceCents: 850, active: true },
+      { id: 'water', itemId: '980000003', name: '矿泉水', priceCents: 200, active: true },
+      { id: 'hidden', itemId: '980000004', name: '下架零食', priceCents: 100, active: false },
+    ];
+    expect(searchProducts(published, '9800').map((product) => product.id)).toEqual(['cola', 'bread', 'water']);
+    expect(searchProducts(published, '').length).toBe(0);
+  });
+
   it('同一商品的多条来源报价都会保留在查询结果中', () => {
     const quotes: Product[] = [
       {
