@@ -492,7 +492,43 @@ h2 { margin-bottom: 0; font-size: 19px; font-weight: 750; letter-spacing: -0.01e
   box-shadow: 0 0 0 999px rgba(10, 13, 16, 0.28);
 }
 .scanner-icon { position: absolute; bottom: 16px; color: rgba(255, 255, 255, 0.85); }
+.scanner-viewfinder-idle { background: #14181d; }
+.scanner-fallback {
+  display: grid;
+  gap: 10px;
+  place-items: center;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 14px;
+}
 .scanner-message { margin: 14px 0 0; color: var(--ink-2); font-size: 14px; line-height: 1.55; }
+.scanner-photo-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 46px;
+  margin-top: 14px;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  background: var(--signal);
+  border: 0;
+  border-radius: var(--radius-m);
+  cursor: pointer;
+}
+.scanner-photo-button:disabled { opacity: 0.6; cursor: default; }
+.scanner-file-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+.scanner-tip { margin: 12px 0 0; color: var(--ink-2); font-size: 13px; line-height: 1.5; opacity: 0.85; }
 
 /* ==========================================================================
    管理员工作台 · 共享结构
