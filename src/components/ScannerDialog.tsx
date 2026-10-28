@@ -1,6 +1,7 @@
-import { BrowserMultiFormatReader } from '@zxing/browser';
+
 import { Camera, Image as ImageIcon, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { createBarcodeReader, decodeBarcodeFromImage } from '../lib/barcode-decode';
 
 type ScannerDialogProps = {
   open: boolean;
@@ -36,6 +37,14 @@ function isWeChatBrowser(): boolean {
   return typeof navigator !== 'undefined' && /MicroMessenger/i.test(navigator.userAgent);
 }
 
+/**
+ * 只有页面本身已经是 HTTPS 时，「换浏览器打开」才真的能拿到相机。
+ * 内网 http 地址在任何浏览器里都不是安全上下文，此时不能给出这条建议。
+ */
+function canEscapeToBrowser(): boolean {
+  return typeof window !== 'undefined' && window.isSecureContext;
+}
+
 export function ScannerDialog({ open, onClose, onDetected }: ScannerDialogProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -63,7 +72,7 @@ export function ScannerDialog({ open, onClose, onDetected }: ScannerDialogProps)
     setMode('probing');
     setMessage(DEFAULT_HINT);
 
-    const reader = new BrowserMultiFormatReader();
+    const reader = createBarcodeReader();
     let stopped = false;
     let controls: { stop: () => void } | undefined;
 
@@ -123,15 +132,16 @@ export function ScannerDialog({ open, onClose, onDetected }: ScannerDialogProps)
     setIsDecodingPhoto(true);
     setMessage('正在识别照片中的条码…');
 
-    const objectUrl = URL.createObjectURL(file);
     try {
-      const reader = new BrowserMultiFormatReader();
-      const result = await reader.decodeFromImageUrl(objectUrl);
-      onDetectedRef.current(result.getText());
+      const code = await decodeBarcodeFromImage(file);
+      if (code) {
+        onDetectedRef.current(code);
+        return;
+      }
+      setMessage('照片中没有识别到条码。请让条码尽量占满画面、保持清晰并避免反光，或改用名称搜索');
     } catch {
-      setMessage('照片中没有识别到条码，请靠近条码重新拍摄，或改用名称搜索');
+      setMessage('这张照片无法读取，请换一张或改用名称搜索');
     } finally {
-      URL.revokeObjectURL(objectUrl);
       setIsDecodingPhoto(false);
     }
   }
@@ -198,7 +208,9 @@ export function ScannerDialog({ open, onClose, onDetected }: ScannerDialogProps)
             />
             {showWeChatTip ? (
               <p className="scanner-tip">
-                小提示：点击右上角 ··· 选择「在浏览器打开」，可直接使用实时扫码。
+                {canEscapeToBrowser()
+                  ? '小提示：点击右上角 ··· 选择「在浏览器打开」，可直接使用实时扫码。'
+                  : '实时扫码需要 HTTPS 访问；当前是内网 http 地址，请先用上面的拍照识别。'}
               </p>
             ) : null}
           </>
